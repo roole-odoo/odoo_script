@@ -32,7 +32,7 @@ install_cmd() {
 }
 
 #=== Check dependencies ===
-check_env() {
+check_ssh_key() {
 	local user_gram
 	local ssh_key_path="/home/odoo/.ssh/id_ed25519"
 	local ssh_pub_key_path="/home/odoo/.ssh/id_ed25519.pub"
@@ -57,6 +57,10 @@ check_env() {
 		echo "Relaunch this script once it's done."
 		exit 0
 	fi
+	git ls-remote git@github.com:odoo/enterprise.git HEAD >/dev/null 2>&1 || (
+		echo "ERROR: GitHub SSH key not configured."
+		exit 1
+	)
 }
 
 check_ubuntu() {
@@ -77,10 +81,16 @@ check_ubuntu() {
 }
 
 check_python() {
-  have python3 || { echo "python3 not found."; exit 1; }
-  echo "Python: $(python3 --version)"
-  python3 -c 'import sys; sys.exit(sys.version_info < (3, 12))' \
-    || { echo "ERROR : need 3.12+."; exit 1; }
+	have python3 || {
+		echo "python3 not found."
+		exit 1
+	}
+	echo "Python: $(python3 --version)"
+	python3 -c 'import sys; sys.exit(sys.version_info < (3, 12))' ||
+		{
+			echo "ERROR : need 3.12+."
+			exit 1
+		}
 }
 
 check_cmd() {
@@ -96,12 +106,6 @@ check_cmd() {
 	echo "$out"
 	echo ""
 }
-
-
-check_ssh_key() {
-git ls-remote git@github.com:odoo/enterprise.git HEAD >/dev/null 2>&1 || (echo "ERROR: GitHub SSH key not configured."; exit 1)
-}
-
 
 #=== Install dependencies ===
 install_wkhtmltopdf() {
@@ -129,16 +133,14 @@ install_rtlcss() {
 	fi
 }
 
-
-
-install_deps(){
-  install_cmd git
-  install_cmd curl
-  install_cmd psql postgresql-18
-  install_wkhtmltopdf
-  install_pgvector
-  install_rtlcss
-  sudo apt  autoremove -y -qq --purge
+install_deps() {
+	install_cmd git
+	install_cmd curl
+	install_cmd psql postgresql-18
+	install_wkhtmltopdf
+	install_pgvector
+	install_rtlcss
+	sudo apt-get autoremove -y -qq --purge
 }
 
 check_deps() {
@@ -154,32 +156,51 @@ check_deps() {
 
 fetch_git_repositories() {
 	local home_path="/home/odoo/"
-	mkdir -p "${home_path}src" && cd "${home_path}src"
-	git clone git@github.com:odoo/odoo.git
-	git clone git@github.com:odoo/enterprise.git
-	git clone git@github.com:odoo/design-themes.git
-	git clone git@github.com:odoo/industry.git
-	(cd "${home_path}src" && sudo ./setup/debinstall.sh)
+	if [[ ! -d "${home_path}src" ]]; then
+		mkdir -p "${home_path}src" && cd "${home_path}src"
+		git clone git@github.com:odoo/odoo.git
+		git clone git@github.com:odoo/enterprise.git
+		git clone git@github.com:odoo/design-themes.git
+		git clone git@github.com:odoo/industry.git
+	fi
+	(cd "${home_path}src/odoo" && sudo ./setup/debinstall.sh)
 }
 
 postgresql_setup() {
-	sudo systemctl start postgresql
-	sudo systemctl enable postgresql
-	sudo -u postgres createuser -d -R -S odoo
+	sudo systemctl enable --now postgresql
+	# sudo -u postgres createuser -d -R -S odoo
+	sudo -u postgres psql -d template1 -c "CREATE EXTENSION IF NOT EXISTS vector;" # Add to template1 ALL FUTUR DB will get it
+}
+
+# TODO Question Still the rigth one industry ?
+setup_odoorc() {
+	curl -fsSL -o /home/odoo/.odoorc https://gist.githubusercontent.com/Abridbus/a4c1ada1e8c61c04ab68cc8ddbb827b1/raw/4614022d0c21bbc02f35254d59c5cefcdbedb12d/.odoorc
+}
+
+# TODO GEM is the new NPM ? More explanation
+install_mailcatcher() {
+	have mailcatcher && return 0
+	sudo apt-get install -y -qq ruby ruby-dev
+	sudo gem install mailcatcher
+}
+
+# TODO Odoo init db creation
+create_database() {
+	local db="${1:-odoo_master}"
+	cd /home/odoo/src/odoo
+	python3 odoo-bin -d "$db" -i base --stop-after-init
 }
 
 main() {
-	check_env
 	check_ubuntu
 	check_python
-
-	# install dependencies
 	install_deps
-
-	# Check dependencie
-	#
-	#
+	check_ssh_key
 	check_deps
+	fetch_git_repositories
+	postgresql_setup
+	setup_odoorc
+	create_database
 }
 
 main
