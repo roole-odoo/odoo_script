@@ -163,6 +163,10 @@ fetch_git_repositories() {
 		git clone git@github.com:odoo/design-themes.git
 		git clone git@github.com:odoo/industry.git
 	fi
+	cd "${home_path}src/odoo/odoo" && git switch master
+	cd "${home_path}src/odoo/entreprise" && git switch master
+	cd "${home_path}src/odoo/design-themes" && git switch master
+	cd "${home_path}src/odoo/industry" && git switch master
 	(cd "${home_path}src/odoo" && sudo ./setup/debinstall.sh)
 }
 
