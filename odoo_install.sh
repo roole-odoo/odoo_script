@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
+DEBUG_FILE="/home/odoo/Desktop/odoo_install.debug"
+
 
 #=== utilities function ===
 usage() {
@@ -10,6 +12,15 @@ Usage: $(basename "$0") blabla
 
 EOF
 }
+
+
+log() { echo "$*" | tee -a "$DEBUG_FILE"; }
+ok()   { log "[  OK  ] $*"; }
+fail()   { log "[ MISS ] $*"; }
+exists() { [[ -e "$1" ]] && ok "$1" || fail "$1"; }
+
+
+
 
 check_help() {
 	[[ $# -eq 0 || "$1" == "-h" || "$1" == "--help" ]] && {
@@ -99,15 +110,15 @@ check_python() {
 check_cmd() {
 	local cmd="$1"
 	if ! have "$cmd"; then
-		echo "$cmd not installed"
+		fail "$cmd not installed"
 		exit 1
 	fi
 	local out
 	out=$("$cmd" --version 2>&1 | head -1)
-	echo ""
-	echo "=== $cmd Installed | VERSION: ==="
-	echo "$out"
-	echo ""
+	log ""
+	ok "$cmd Installed"
+	log "VERSION : $out"
+	log ""
 }
 
 #=== Install dependencies ===
@@ -145,12 +156,26 @@ install_deps() {
 }
 
 check_deps() {
+	log "--- 1. System ---"
+	. /etc/os-release
+	log "OS       : $ID $VERSION_ID"
+	log "User     : $USER"
+	log "--- 2. python ---"
 	check_cmd python3
+	log "--- 3. dependencies ---"
 	check_cmd git
 	check_cmd curl
-	check_cmd rtlcss
 	check_cmd psql
 	check_cmd wkhtmltopdf
+	log "--- 4. Folders ---"
+	exists /home/odoo/src
+	exists /home/odoo/src/odoo
+	exists /home/odoo/src/enterprise
+	exists /home/odoo/src/design-themes
+	exists /home/odoo/src/industry
+	log "--- 6. Extra dependencies ---"
+	check_cmd rtlcss
+	check_cmd mailcatcher
 }
 
 #=== GIT PART ===
@@ -200,16 +225,39 @@ create_database() {
 	python3 odoo-bin -d "$db" -i base --stop-after-init
 }
 
-main() {
+normal_installation() {
 	check_ubuntu
 	check_python
 	install_deps
 	check_ssh_key
-	#check_deps
 	fetch_git_repositories
 	postgresql_setup
 	create_database
 	setup_odoorc
 }
 
-main
+advanced_installation() {
+	check_ubuntu
+	check_python
+	install_deps
+	install_rtlcss # left-to-right 
+	install_mailcatcher # mail
+	check_ssh_key
+	fetch_git_repositories
+	postgresql_setup
+	create_database
+	setup_odoorc
+}
+
+
+echo "1) Complete Install  2) Check Tools  3) Advanced Install  4) Exit"
+read -rp "Select option [1-5]: " choice
+
+case "$choice" in
+  1) normal_installation;;
+  2) debug ;;
+  3) advanced_installation;;
+  4) exit 0 ;;
+  *) echo "Invalid option" ;;
+esac
+
