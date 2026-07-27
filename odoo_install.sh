@@ -45,22 +45,25 @@ check_ssh_key() {
 		echo "SSH key not found. Generating new ed25519 SSH key for '${user_gram}@odoo.com'."
 		echo "Path to add the key: ${ssh_key_path}"
 		ssh-keygen -t ed25519 -C "${user_gram}@odoo.com" -f "$ssh_key_path"
-		echo "Data to be added in GitHub user profile [https://github.com/settings/keys](New SSH key):"
+		echo "Add the data below to your GitHub user profile https://github.com/settings/keys:"
+
 		echo "$(<$ssh_pub_key_path)"
 
 	fi
-	read -r -p "Key added to your GitHub account ? [y/N]: " answer
-	if [[ "$answer" =~ ^[Yy]$ ]]; then
-		echo "Starting the installation in 5s ..."
-		sleep 5
-	else
-		echo "Relaunch this script once it's done."
-		exit 0
-	fi
-	git ls-remote git@github.com:odoo/enterprise.git HEAD >/dev/null 2>&1 || (
-		echo "ERROR: GitHub SSH key not configured."
-		exit 1
-	)
+	while true; do
+		read -r -p "Key added to your GitHub account ? [y/N]: " answer
+		if [[ "$answer" =~ ^[Yy]$ ]]; then
+			echo "Starting the installation in 5s ..."
+			sleep 5
+		else
+			echo "Relaunch this script once it's done."
+			exit 0
+		fi
+		(git ls-remote git@github.com:odoo/enterprise.git HEAD >/dev/null 2>&1 && break )|| (
+			echo "ERROR: GitHub SSH key not configured."
+			exit 1
+		)
+	done
 }
 
 check_ubuntu() {
@@ -139,7 +142,6 @@ install_deps() {
 	install_cmd psql postgresql-18
 	install_wkhtmltopdf
 	install_pgvector
-	sudo apt-get autoremove -y -qq --purge
 }
 
 check_deps() {
@@ -162,10 +164,10 @@ fetch_git_repositories() {
 		git clone git@github.com:odoo/design-themes.git
 		git clone git@github.com:odoo/industry.git
 	fi
-	cd "${home_path}src/odoo/odoo" && git switch master
-	cd "${home_path}src/odoo/entreprise" && git switch master
-	cd "${home_path}src/odoo/design-themes" && git switch master
-	cd "${home_path}src/odoo/industry" && git switch master
+	cd "${home_path}src/odoo" && git switch master
+	cd "${home_path}src/entreprise" && git switch master
+	cd "${home_path}src/design-themes" && git switch master
+	cd "${home_path}src/industry" && git switch master
 	(cd "${home_path}src/odoo" && sudo ./setup/debinstall.sh)
 }
 
@@ -176,7 +178,7 @@ postgresql_setup() {
 }
 
 setup_odoorc() {
-	curl -fsSL -o /home/odoo/.odoorc https://gist.githubusercontent.com/Abridbus/a4c1ada1e8c61c04ab68cc8ddbb827b1/raw/4614022d0c21bbc02f35254d59c5cefcdbedb12d/.odoorc
+	curl -fsSL -o /home/odoo/src/.odoorc https://gist.githubusercontent.com/Abridbus/a4c1ada1e8c61c04ab68cc8ddbb827b1/raw/4614022d0c21bbc02f35254d59c5cefcdbedb12d/.odoorc
 }
 
 install_mailcatcher() {
@@ -203,7 +205,7 @@ main() {
 	check_python
 	install_deps
 	check_ssh_key
-	check_deps
+	#check_deps
 	fetch_git_repositories
 	postgresql_setup
 	create_database
