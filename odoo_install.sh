@@ -91,7 +91,6 @@ check_cmd() {
 	local cmd="$1"
 	if ! have "$cmd"; then
 		fail "$cmd not installed"
-		exit 1
 	fi
 	local out
 	out=$("$cmd" --version 2>&1 | head -1)
@@ -214,7 +213,7 @@ set_expiration_date() {
 
 		DELETE FROM ir_config_parameter WHERE key = 'database.expiration_reason';
 	EOF
-	echo "Expiration date set on '$db'."
+	echo "Expiration date set on '$DB_NAME'."
 }
 normal_installation() {
 	check_ubuntu
@@ -223,8 +222,8 @@ normal_installation() {
 	check_ssh_key
 	fetch_git_repositories
 	postgresql_setup
-	create_database
 	setup_odoorc
+	create_database
 	set_expiration_date
 }
 
