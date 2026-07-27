@@ -139,7 +139,6 @@ install_deps() {
 	install_cmd psql postgresql-18
 	install_wkhtmltopdf
 	install_pgvector
-	install_rtlcss
 	sudo apt-get autoremove -y -qq --purge
 }
 
@@ -176,21 +175,25 @@ postgresql_setup() {
 	sudo -u postgres psql -d template1 -c "CREATE EXTENSION IF NOT EXISTS vector;" # Add to template1 ALL FUTUR DB will get it
 }
 
-# TODO Question Still the rigth one industry ?
 setup_odoorc() {
 	curl -fsSL -o /home/odoo/.odoorc https://gist.githubusercontent.com/Abridbus/a4c1ada1e8c61c04ab68cc8ddbb827b1/raw/4614022d0c21bbc02f35254d59c5cefcdbedb12d/.odoorc
 }
 
-# TODO GEM is the new NPM ? More explanation
 install_mailcatcher() {
 	have mailcatcher && return 0
 	sudo apt-get install -y -qq ruby ruby-dev
 	sudo gem install mailcatcher
 }
 
-# TODO Odoo init db creation
 create_database() {
-	local db="${1:-odoo_master}"
+	pattern="^[0-9a-zA-Z_-]{60}$"
+	while :; do
+		read -r -p "Name of your database:  " user_input
+		if [[ $user_input =~ $pattern ]]; then
+			break
+		fi
+		echo "Invalid database name: Only allowed underscores (_), hyphens (-) and  alphanumeric characters(a-z,A-Z,0-9). Please try again."
+	done
 	cd /home/odoo/src/odoo
 	python3 odoo-bin -d "$db" -i base --stop-after-init
 }
@@ -203,8 +206,8 @@ main() {
 	check_deps
 	fetch_git_repositories
 	postgresql_setup
-	setup_odoorc
 	create_database
+	setup_odoorc
 }
 
 main
