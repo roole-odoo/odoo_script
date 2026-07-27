@@ -1,34 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 DEBUG_FILE="/home/odoo/Desktop/odoo_install.debug"
-
-
-#=== utilities function ===
-usage() {
-	cat <<EOF
-Usage: $(basename "$0") blabla
-
-
-
-EOF
-}
-
+DB_NAME=""
 
 log() { echo "$*" | tee -a "$DEBUG_FILE"; }
 ok()   { log "[  OK  ] $*"; }
 fail()   { log "[ MISS ] $*"; }
 exists() { [[ -e "$1" ]] && ok "$1" || fail "$1"; }
-
-
-
-
-check_help() {
-	[[ $# -eq 0 || "$1" == "-h" || "$1" == "--help" ]] && {
-		usage
-		exit 0
-	} # check the --help  TODO make a better args parser
-}
-
+repo_check() { [[ -d "$1/.git" ]] && ok "$1 ($(git -C "$1" rev-parse --abbrev-ref HEAD))" || fail "$1"; }
 have() { command -v "$1" >/dev/null 2>&1; } # Check a cmd
 
 install_cmd() {
@@ -38,7 +17,7 @@ install_cmd() {
 	else
 		echo "$cmd missing, installing $pkg"
 		sudo apt-get install -y -qq "$pkg"
-		have "$cmd" || echo "$cmd installed"
+		have "$cmd" || echo "$cmd install failed"
 	fi
 }
 
@@ -70,10 +49,11 @@ check_ssh_key() {
 			echo "Relaunch this script once it's done."
 			exit 0
 		fi
-		(git ls-remote git@github.com:odoo/enterprise.git HEAD >/dev/null 2>&1 && break )|| (
-			echo "ERROR: GitHub SSH key not configured."
-			exit 1
-		)
+		if git ls-remote git@github.com:odoo/enterprise.git HEAD >/dev/null 2>&1; then
+			echo "GitHub SSH access OK."
+			break
+		fi
+		echo "ERROR: GitHub SSH key not configured yet."
 	done
 }
 
@@ -135,7 +115,7 @@ install_pgvector() {
 }
 
 install_rtlcss() {
-	read -r -p "Need 'left-to-right' compatibility ? [y/N]: " answer
+	read -r -p "Need RTLCSS ? It's for the Odoo interface for right-to-left languages (Arabic, Hebrew). Only needed if you work on those. [y/N]: " answer
 	if [[ "$answer" =~ ^[Yy]$ ]]; then
 		install_cmd npm
 		sudo npm install -g rtlcss
@@ -169,10 +149,10 @@ check_deps() {
 	check_cmd wkhtmltopdf
 	log "--- 4. Folders ---"
 	exists /home/odoo/src
-	exists /home/odoo/src/odoo
-	exists /home/odoo/src/enterprise
-	exists /home/odoo/src/design-themes
-	exists /home/odoo/src/industry
+	repo_check /home/odoo/src/odoo
+	repo_check /home/odoo/src/enterprise
+	repo_check /home/odoo/src/design-themes
+	repo_check /home/odoo/src/industry
 	log "--- 6. Extra dependencies ---"
 	check_cmd rtlcss
 	check_cmd mailcatcher
@@ -190,7 +170,7 @@ fetch_git_repositories() {
 		git clone git@github.com:odoo/industry.git
 	fi
 	cd "${home_path}src/odoo" && git switch master
-	cd "${home_path}src/entreprise" && git switch master
+	cd "${home_path}src/enterprise" && git switch master
 	cd "${home_path}src/design-themes" && git switch master
 	cd "${home_path}src/industry" && git switch master
 	(cd "${home_path}src/odoo" && sudo ./setup/debinstall.sh)
@@ -198,8 +178,9 @@ fetch_git_repositories() {
 
 postgresql_setup() {
 	sudo systemctl enable --now postgresql
-	# sudo -u postgres createuser -d -R -S odoo
+	sudo -u postgres createuser -d -R -S odoo
 	sudo -u postgres psql -d template1 -c "CREATE EXTENSION IF NOT EXISTS vector;" # Add to template1 ALL FUTUR DB will get it
+
 }
 
 setup_odoorc() {
@@ -207,24 +188,34 @@ setup_odoorc() {
 }
 
 install_mailcatcher() {
-	have mailcatcher && return 0
-	sudo apt-get install -y -qq ruby ruby-dev
-	sudo gem install mailcatcher
+	read -r -p "Need MailCatcher ? It's for having on local a mailing solution. [y/N]: " answer
+	if [[ "$answer" =~ ^[Yy]$ ]]; then
+		have mailcatcher && return 0
+		sudo apt-get install -y -qq ruby ruby-dev
+		sudo gem install mailcatcher
+	fi
 }
 
 create_database() {
-	pattern="^[0-9a-zA-Z_-]{60}$"
+	local pattern="^[0-9a-zA-Z_-]{1,60}$"
 	while :; do
-		read -r -p "Name of your database:  " user_input
-		if [[ $user_input =~ $pattern ]]; then
-			break
-		fi
-		echo "Invalid database name: Only allowed underscores (_), hyphens (-) and  alphanumeric characters(a-z,A-Z,0-9). Please try again."
+		read -r -p "Name of your database: " DB_NAME
+		[[ $DB_NAME =~ $pattern ]] && break
+		echo "Invalid name: only a-z, A-Z, 0-9, _ and - allowed."
 	done
 	cd /home/odoo/src/odoo
-	python3 odoo-bin -d "$db" -i base --stop-after-init
+	python3 odoo-bin -d "$DB_NAME" -i base --stop-after-init
 }
+set_expiration_date() {
+	psql -d "$DB_NAME" <<-'EOF'
+		INSERT INTO ir_config_parameter (key, value)
+		VALUES ('database.expiration_date', '2998-05-07 13:16:50')
+		ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
 
+		DELETE FROM ir_config_parameter WHERE key = 'database.expiration_reason';
+	EOF
+	echo "Expiration date set on '$db'."
+}
 normal_installation() {
 	check_ubuntu
 	check_python
@@ -234,6 +225,7 @@ normal_installation() {
 	postgresql_setup
 	create_database
 	setup_odoorc
+	set_expiration_date
 }
 
 advanced_installation() {
@@ -247,15 +239,16 @@ advanced_installation() {
 	postgresql_setup
 	create_database
 	setup_odoorc
+	set_expiration_date
 }
 
 
 echo "1) Complete Install  2) Check Tools  3) Advanced Install  4) Exit"
-read -rp "Select option [1-5]: " choice
+read -rp "Select option [1-4]: " choice
 
 case "$choice" in
   1) normal_installation;;
-  2) debug ;;
+  2) check_deps ;;
   3) advanced_installation;;
   4) exit 0 ;;
   *) echo "Invalid option" ;;
