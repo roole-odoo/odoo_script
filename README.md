@@ -1,20 +1,17 @@
 # odoo_scripti
 
-## Todo list: 
+## TODO
+- Script should run on 26.04 and 24.04.
+- Odoo is working well ? Odoorc, IA, all posgress changes ? Need to check on a produced db if it's running 
 
-- Github repositories directly on master 
-- Config PSQL :
 
-```sql
-psql -d $dbname -c "update ir_config_parameter set value='2998-05-07 13:16:50' where key='database.expiration_date';"
-psql -d $dbname -c "delete from ir_config_parameter where key='database.expiration_reason'"
-```
+## Explained
 
-- Generate a full log of the input
-- Generate a function that give all the usefull information to debug
-- Create a bash Menu
+Script run a menu.
+If debug choisen /home/odoo/Desktop/odoo_install.debug"
+Log always at /var/log/odoo_installation.log (cleaned at each run,wanted ? ) 
 
-## Workflow Explained:
+## Normal Workflow Explained:
 
 1. Check if it ubuntu 26.04 or 24.04
 2. Check the Python version 3.14
