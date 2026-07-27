@@ -3,6 +3,11 @@ set -euo pipefail
 DEBUG_FILE="/home/odoo/Desktop/odoo_install.debug"
 DB_NAME=""
 
+LOG_FILE="/var/odoo_installation.log"
+sudo touch "$LOG_FILE" && sudo chown "$USER" "$LOG_FILE"
+exec >>"$LOG_FILE"                    # stdout -> full log only
+exec 2> >(tee -a "$LOG_FILE" >&2)
+
 log() { echo "$*" | tee -a "$DEBUG_FILE"; }
 ok()   { log "[  OK  ] $*"; }
 fail()   { log "[ MISS ] $*"; }
