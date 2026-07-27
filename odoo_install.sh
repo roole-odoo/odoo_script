@@ -1,32 +1,46 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail
 DEBUG_FILE="/home/odoo/Desktop/odoo_install.debug"
+LOG="/var/log/odoo_installation.log"
 DB_NAME=""
 
-LOG_FILE="/var/odoo_installation.log"
-sudo touch "$LOG_FILE" && sudo chown "$USER" "$LOG_FILE"
-exec >>"$LOG_FILE"                    # stdout -> full log only
-exec 2> >(tee -a "$LOG_FILE" >&2)
+# Create a LOG file a each run
+sudo -v touch "$LOG" && sudo chown "$USER" "$LOG"
+: > "$LOG"
 
+
+# Put the outuput of heavy cmd into LOG  (often for apt)
+run() { "$@" >>"$LOG" 2>&1; }
+
+# catch if the script crash
+trap 'echo; echo "FAILED (line $LINENO). Last lines of $LOG:"; tail -n 15 "$LOG"' ERR
+
+# Echo + in debug file
 log() { echo "$*" | tee -a "$DEBUG_FILE"; }
+
 ok()   { log "[  OK  ] $*"; }
-fail()   { log "[ MISS ] $*"; }
+
+fail()   { log "[ MISS ] $*"; } 
+
 exists() { [[ -e "$1" ]] && ok "$1" || fail "$1"; }
+
+# Check the repo and print the branch
 repo_check() { [[ -d "$1/.git" ]] && ok "$1 ($(git -C "$1" rev-parse --abbrev-ref HEAD))" || fail "$1"; }
+
 have() { command -v "$1" >/dev/null 2>&1; } # Check a cmd
 
 install_cmd() {
 	local cmd="$1" pkg="${2:-$1}"
 	if have "$cmd"; then
-		echo " $cmd installed."
+		echo "  $cmd already installed."
 	else
-		echo "$cmd missing, installing $pkg"
-		sudo apt-get install -y -qq "$pkg"
-		have "$cmd" || echo "$cmd install failed"
+		echo "  Installing $pkg ..."
+		run sudo apt-get install -y "$pkg"
+		have "$cmd" || echo "  WARNING: $cmd install failed"
 	fi
 }
 
-#=== Check dependencies ===
+
 check_ssh_key() {
 	local user_gram
 	local ssh_key_path="/home/odoo/.ssh/id_ed25519"
@@ -41,9 +55,7 @@ check_ssh_key() {
 		echo "Path to add the key: ${ssh_key_path}"
 		ssh-keygen -t ed25519 -C "${user_gram}@odoo.com" -f "$ssh_key_path"
 		echo "Add the data below to your GitHub user profile https://github.com/settings/keys:"
-
 		echo "$(<$ssh_pub_key_path)"
-
 	fi
 	while true; do
 		read -r -p "Key added to your GitHub account ? [y/N]: " answer
@@ -62,9 +74,10 @@ check_ssh_key() {
 	done
 }
 
+
 check_ubuntu() {
 	. /etc/os-release # Get ID and verison varialbe
-	echo "$ID : $VERSION_ID"
+	echo "System: $ID $VERSION_ID (user $USER)"
 	if [[ "$ID" != "ubuntu" ]]; then
 		echo "ERROR: expected ubuntu, found: $ID. OS not supported. Exit..."
 		exit 1
@@ -79,6 +92,7 @@ check_ubuntu() {
 	fi
 }
 
+
 check_python() {
 	have python3 || {
 		echo "python3 not found."
@@ -92,10 +106,12 @@ check_python() {
 		}
 }
 
+
 check_cmd() {
 	local cmd="$1"
 	if ! have "$cmd"; then
 		fail "$cmd not installed"
+		return
 	fi
 	local out
 	out=$("$cmd" --version 2>&1 | head -1)
@@ -105,39 +121,49 @@ check_cmd() {
 	log ""
 }
 
-#=== Install dependencies ===
+
 install_wkhtmltopdf() {
 	wkhtmltopdf --version 2>/dev/null | grep -q "with patched qt" && return 0
-	sudo dpkg -r wkhtmltox 2>/dev/null || true
-	curl -sSL https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6.1-2/wkhtmltox_0.12.6.1-2.jammy_amd64.deb -o /tmp/wkhtml.deb
-	sudo apt-get -y install --no-install-recommends --fix-missing -qq /tmp/wkhtml.deb
+	echo "  Installing wkhtmltopdf (patched qt) ..."
+	run sudo dpkg -r wkhtmltox || true
+	run curl -sSL https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6.1-2/wkhtmltox_0.12.6.1-2.jammy_amd64.deb -o /tmp/wkhtml.deb
+	run sudo apt-get -y install --no-install-recommends --fix-missing /tmp/wkhtml.deb
 	rm -f /tmp/wkhtml.deb
 }
 
+
 install_pgvector() {
-	sudo apt-get install -y -qq "postgresql-18-pgvector"
+	echo "  Installing pgvector ..."
+	run sudo apt-get install -y "postgresql-18-pgvector"
 }
+
 
 install_rtlcss() {
 	read -r -p "Need RTLCSS ? It's for the Odoo interface for right-to-left languages (Arabic, Hebrew). Only needed if you work on those. [y/N]: " answer
 	if [[ "$answer" =~ ^[Yy]$ ]]; then
 		install_cmd npm
-		sudo npm install -g rtlcss
+		echo "  Installing rtlcss ..."
+		run sudo npm install -g rtlcss
 		read -r -p "Remove NPM ? [y/N]: " answer
-
 		if [[ "$answer" =~ ^[Yy]$ ]]; then
-			sudo apt-get -y -qq remove npm
+			echo "  Removing npm ..."
+			run sudo apt-get -y remove npm
 		fi
 	fi
 }
 
+
+
 install_deps() {
+	echo "Installing system dependencies ..."
 	install_cmd git
 	install_cmd curl
 	install_cmd psql postgresql-18
 	install_wkhtmltopdf
 	install_pgvector
+	echo "Dependencies ready."
 }
+
 
 check_deps() {
 	log "--- 1. System ---"
@@ -160,45 +186,56 @@ check_deps() {
 	log "--- 6. Extra dependencies ---"
 	check_cmd rtlcss
 	check_cmd mailcatcher
+	echo "Report saved to $DEBUG_FILE"
 }
 
-#=== GIT PART ===
 
 fetch_git_repositories() {
 	local home_path="/home/odoo/"
+	local repo
 	if [[ ! -d "${home_path}src" ]]; then
 		mkdir -p "${home_path}src" && cd "${home_path}src"
-		git clone git@github.com:odoo/odoo.git
-		git clone git@github.com:odoo/enterprise.git
-		git clone git@github.com:odoo/design-themes.git
-		git clone git@github.com:odoo/industry.git
+        git clone git@github.com:odoo/odoo.git
+        git clone git@github.com:odoo/enterprise.git
+        git clone git@github.com:odoo/design-themes.git
+        git clone git@github.com:odoo/industry.git
+	else
+		echo "  ${home_path}src already exists, skipping clone."
 	fi
-	cd "${home_path}src/odoo" && git switch master
-	cd "${home_path}src/enterprise" && git switch master
-	cd "${home_path}src/design-themes" && git switch master
-	cd "${home_path}src/industry" && git switch master
-	(cd "${home_path}src/odoo" && sudo ./setup/debinstall.sh)
+	echo "  Switching repositories to master ..."
+    cd "${home_path}src/odoo" && git switch master
+    cd "${home_path}src/enterprise" && git switch master
+    cd "${home_path}src/design-themes" && git switch master
+    cd "${home_path}src/industry" && git switch master
+	echo "  Installing Odoo debian dependencies (setup/debinstall.sh) ..."
+	run sudo "${home_path}src/odoo/setup/debinstall.sh"
 }
+
 
 postgresql_setup() {
+	echo "Configuring PostgreSQL ..."
 	sudo systemctl enable --now postgresql
 	sudo -u postgres createuser -d -R -S odoo
-	sudo -u postgres psql -d template1 -c "CREATE EXTENSION IF NOT EXISTS vector;" # Add to template1 ALL FUTUR DB will get it
-
+	sudo -u postgres psql -d template1 -c "CREATE EXTENSION IF NOT EXISTS vector;" # ALL FUTUR DB will get it
 }
+
 
 setup_odoorc() {
-	curl -fsSL -o /home/odoo/src/.odoorc https://gist.githubusercontent.com/Abridbus/a4c1ada1e8c61c04ab68cc8ddbb827b1/raw/4614022d0c21bbc02f35254d59c5cefcdbedb12d/.odoorc
+	echo "Fetching .odoorc configuration ..."
+	run curl -fsSL -o /home/odoo/src/.odoorc https://gist.githubusercontent.com/Abridbus/a4c1ada1e8c61c04ab68cc8ddbb827b1/raw/4614022d0c21bbc02f35254d59c5cefcdbedb12d/.odoorc
 }
+
 
 install_mailcatcher() {
 	read -r -p "Need MailCatcher ? It's for having on local a mailing solution. [y/N]: " answer
 	if [[ "$answer" =~ ^[Yy]$ ]]; then
 		have mailcatcher && return 0
-		sudo apt-get install -y -qq ruby ruby-dev
-		sudo gem install mailcatcher
+		echo "  Installing MailCatcher ..."
+		run sudo apt-get install -y ruby ruby-dev
+		run sudo gem install mailcatcher
 	fi
 }
+
 
 create_database() {
 	local pattern="^[0-9a-zA-Z_-]{1,60}$"
@@ -208,18 +245,22 @@ create_database() {
 		echo "Invalid name: only a-z, A-Z, 0-9, _ and - allowed."
 	done
 	cd /home/odoo/src/odoo
-	python3 odoo-bin -d "$DB_NAME" -i base --stop-after-init
+	echo "Creating database '$DB_NAME' (a few minutes) ..."
+	run python3 odoo-bin -d "$DB_NAME" -i base --stop-after-init
 }
+
+
 set_expiration_date() {
-	psql -d "$DB_NAME" <<-'EOF'
+	psql -d "$DB_NAME" >>"$LOG" 2>&1 <<-'SQL'
 		INSERT INTO ir_config_parameter (key, value)
 		VALUES ('database.expiration_date', '2998-05-07 13:16:50')
 		ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
-
 		DELETE FROM ir_config_parameter WHERE key = 'database.expiration_reason';
-	EOF
+	SQL
 	echo "Expiration date set on '$DB_NAME'."
 }
+
+
 normal_installation() {
 	check_ubuntu
 	check_python
@@ -230,13 +271,15 @@ normal_installation() {
 	setup_odoorc
 	create_database
 	set_expiration_date
+	echo "Installation complete. Full log: $LOG"
 }
+
 
 advanced_installation() {
 	check_ubuntu
 	check_python
 	install_deps
-	install_rtlcss # left-to-right 
+	install_rtlcss # right-to-left
 	install_mailcatcher # mail
 	check_ssh_key
 	fetch_git_repositories
@@ -244,17 +287,19 @@ advanced_installation() {
 	create_database
 	setup_odoorc
 	set_expiration_date
+	echo "Installation complete. Full log: $LOG"
 }
 
+menu(){
+	echo "1) Complete Install  2) Check Tools  3) Advanced Install  4) Exit"
+	read -rp "Select option [1-4]: " choice
+	case "$choice" in
+	  1) normal_installation;;
+	  2) check_deps ;;
+	  3) advanced_installation;;
+	  4) exit 0 ;;
+	  *) echo "Invalid option"; menu ;;
+	esac
+}
 
-echo "1) Complete Install  2) Check Tools  3) Advanced Install  4) Exit"
-read -rp "Select option [1-4]: " choice
-
-case "$choice" in
-  1) normal_installation;;
-  2) check_deps ;;
-  3) advanced_installation;;
-  4) exit 0 ;;
-  *) echo "Invalid option" ;;
-esac
-
+menu

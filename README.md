@@ -29,5 +29,5 @@ psql -d $dbname -c "delete from ir_config_parameter where key='database.expirati
 9. Install odoo deps : (./setup/debinstall.sh)
 10. Setup PQSL ast service, add vector to dbname
 11. \[USER ACTION\] Waiting for a DB name.
-12. run `python3 odoo-bin -d "$db" -i base --stop-after-init
-13. Download Odoorc
+12. Download Odoorc
+13. run `python3 odoo-bin -d "$db" -i base --stop-after-init
