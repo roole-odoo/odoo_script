@@ -1,5 +1,17 @@
 # odoo_scripti
 
+## Installation
+
+USE THIS KNOWLEDGE PAGE : 
+
+Open a terminal (CTRL + ALT + T)
+run this commands:
+`curl https://raw.githubusercontent.com/roole-odoo/odoo_script/refs/heads/main/odoo_install.sh > odoo_install.sh`
+`chmod +x odoo_install.sh`
+./odoo_install.sh
+
+
+
 ## TODO
 - Script should run on 26.04 and 24.04.
 - Odoo is working well ? Odoorc, IA, all posgress changes ? Need to check on a produced db if it's running 
