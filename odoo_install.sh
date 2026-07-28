@@ -4,6 +4,11 @@ DEBUG_FILE="/home/odoo/Desktop/odoo_install.debug"
 LOG="/var/log/odoo_installation.log"
 DB_NAME=""
 
+RED=$'\e[31m'
+GREEN=$'\e[32m'
+BLUE=$'\e[34m'
+ENDCOLOR=$'\e[0m'
+
 # Create a LOG file a each run
 sudo -v touch "$LOG" && sudo chown "$USER" "$LOG"
 : > "$LOG"
@@ -18,9 +23,9 @@ trap 'echo; echo "FAILED (line $LINENO). Last lines of $LOG:"; tail -n 15 "$LOG"
 # Echo + in debug file
 log() { echo "$*" | tee -a "$DEBUG_FILE"; }
 
-ok()   { log "[  OK  ] $*"; }
+ok()   { log "${GREEN}[  OK  ] $*${ENDCOLOR}"; }
 
-fail()   { log "[ MISS ] $*"; } 
+fail() { log "${RED}[ MISS ] $*${ENDCOLOR}"; }
 
 exists() { [[ -e "$1" ]] && ok "$1" || fail "$1"; }
 
@@ -32,11 +37,11 @@ have() { command -v "$1" >/dev/null 2>&1; } # Check a cmd
 install_cmd() {
 	local cmd="$1" pkg="${2:-$1}"
 	if have "$cmd"; then
-		echo "  $cmd already installed."
+		echo "${BLUE}  $cmd already installed.${ENDCOLOR}"
 	else
-		echo "  Installing $pkg ..."
+		echo "${BLUE}  Installing $pkg ...${ENDCOLOR}"
 		run sudo apt-get install -y "$pkg"
-		have "$cmd" || echo "  WARNING: $cmd install failed"
+		have "$cmd" || echo "${RED}  WARNING: $cmd install failed${ENDCOLOR}"
 	fi
 }
 
@@ -47,47 +52,47 @@ check_ssh_key() {
 	local ssh_pub_key_path="/home/odoo/.ssh/id_ed25519.pub"
 	user_gram="$(cut -d '-' -f 1 </etc/hostname)"
 	if [[ -f "${ssh_pub_key_path}" ]]; then
-		echo "A SSH key is already created (${ssh_key_path}), be sure it's linked to your GitHub profile."
-		echo "Data to be checked in GitHub user profile [https://github.com/settings/keys]:"
+		echo "${BLUE}A SSH key is already created (${ssh_key_path}), be sure it's linked to your GitHub profile.${ENDCOLOR}"
+		echo "${BLUE}Data to be checked in GitHub user profile [https://github.com/settings/keys]:${ENDCOLOR}"
 		echo "$(<$ssh_pub_key_path)"
 	else
-		echo "SSH key not found. Generating new ed25519 SSH key for '${user_gram}@odoo.com'."
-		echo "Path to add the key: ${ssh_key_path}"
+		echo "${BLUE}SSH key not found. Generating new ed25519 SSH key for '${user_gram}@odoo.com'.${ENDCOLOR}"
+		echo "${BLUE}Path to add the key: ${ssh_key_path}${ENDCOLOR}"
 		ssh-keygen -t ed25519 -C "${user_gram}@odoo.com" -f "$ssh_key_path"
-		echo "Add the data below to your GitHub user profile https://github.com/settings/keys:"
+		echo "${GREEN}Add the data below to your GitHub user profile https://github.com/settings/keys:${ENDCOLOR}"
 		echo "$(<$ssh_pub_key_path)"
 	fi
 	while true; do
-		read -r -p "Key added to your GitHub account ? [y/N]: " answer
+		read -r -p "${GREEN}Key added to your GitHub account ? [y/N]: ${ENDCOLOR}" answer
 		if [[ "$answer" =~ ^[Yy]$ ]]; then
-			echo "Starting the installation in 5s ..."
+			echo "${BLUE}Starting the installation in 5s ...${ENDCOLOR}"
 			sleep 5
 		else
-			echo "Relaunch this script once it's done."
+			echo "${BLUE}Relaunch this script once it's done.${ENDCOLOR}"
 			exit 0
 		fi
 		if git ls-remote git@github.com:odoo/enterprise.git HEAD >/dev/null 2>&1; then
-			echo "GitHub SSH access OK."
+			echo "${BLUE}GitHub SSH access OK.${ENDCOLOR}"
 			break
 		fi
-		echo "ERROR: GitHub SSH key not configured yet."
+		echo "${RED}ERROR: GitHub SSH key not configured yet.${ENDCOLOR}"
 	done
 }
 
 
 check_ubuntu() {
 	. /etc/os-release # Get ID and verison varialbe
-	echo "System: $ID $VERSION_ID (user $USER)"
+	echo "${BLUE}System: $ID $VERSION_ID (user $USER)${ENDCOLOR}"
 	if [[ "$ID" != "ubuntu" ]]; then
-		echo "ERROR: expected ubuntu, found: $ID. OS not supported. Exit..."
+		echo "${RED}ERROR: expected ubuntu, found: $ID. OS not supported. Exit...${ENDCOLOR}"
 		exit 1
 	fi
 	if [[ "$VERSION_ID" != "24.04" && "$VERSION_ID" != "26.04" ]]; then
-		echo "Your installation variant is not supported, expected version: '24.04' or '26.04' found: $VERSION_ID."
+		echo "${RED}Your installation variant is not supported, expected version: '24.04' or '26.04' found: $VERSION_ID.${ENDCOLOR}"
 		exit 1
 	fi
 	if [[ "${USER}" != "odoo" ]]; then
-		echo "ERROR: expected 'odoo' username, only OSes provided by Odoo are supported. Exit..."
+		echo "${RED}ERROR: expected 'odoo' username, only OSes provided by Odoo are supported. Exit...${ENDCOLOR}"
 		exit 1
 	fi
 }
@@ -95,13 +100,13 @@ check_ubuntu() {
 
 check_python() {
 	have python3 || {
-		echo "python3 not found."
+		echo "${RED}python3 not found.${ENDCOLOR}"
 		exit 1
 	}
 	echo "Python: $(python3 --version)"
 	python3 -c 'import sys; sys.exit(sys.version_info < (3, 12))' ||
 		{
-			echo "ERROR : need 3.12+."
+			echo "${RED}ERROR : need 3.12+.${ENDCOLOR}"
 			exit 1
 		}
 }
@@ -124,7 +129,7 @@ check_cmd() {
 
 install_wkhtmltopdf() {
 	wkhtmltopdf --version 2>/dev/null | grep -q "with patched qt" && return 0
-	echo "  Installing wkhtmltopdf (patched qt) ..."
+	echo "${BLUE}  Installing wkhtmltopdf (patched qt) ...${ENDCOLOR}"
 	run sudo dpkg -r wkhtmltox || true
 	run curl -sSL https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6.1-2/wkhtmltox_0.12.6.1-2.jammy_amd64.deb -o /tmp/wkhtml.deb
 	run sudo apt-get -y install --no-install-recommends --fix-missing /tmp/wkhtml.deb
@@ -133,20 +138,20 @@ install_wkhtmltopdf() {
 
 
 install_pgvector() {
-	echo "  Installing pgvector ..."
+	echo "${BLUE}  Installing pgvector ...${ENDCOLOR}"
 	run sudo apt-get install -y "postgresql-18-pgvector"
 }
 
 
 install_rtlcss() {
-	read -r -p "Need RTLCSS ? It's for the Odoo interface for right-to-left languages (Arabic, Hebrew). Only needed if you work on those. [y/N]: " answer
+	read -r -p "${GREEN}Need RTLCSS ? It's for the Odoo interface for right-to-left languages (Arabic, Hebrew). Only needed if you work on those. [y/N]: ${ENDCOLOR}" answer
 	if [[ "$answer" =~ ^[Yy]$ ]]; then
 		install_cmd npm
-		echo "  Installing rtlcss ..."
+		echo "${BLUE}  Installing rtlcss ...${ENDCOLOR}"
 		run sudo npm install -g rtlcss
-		read -r -p "Remove NPM ? [y/N]: " answer
+		read -r -p "${GREEN}Remove NPM ? [y/N]: ${ENDCOLOR}" answer
 		if [[ "$answer" =~ ^[Yy]$ ]]; then
-			echo "  Removing npm ..."
+			echo "${BLUE}  Removing npm ...${ENDCOLOR}"
 			run sudo apt-get -y remove npm
 		fi
 	fi
@@ -155,13 +160,13 @@ install_rtlcss() {
 
 
 install_deps() {
-	echo "Installing system dependencies ..."
+	echo "${BLUE}Installing system dependencies ...${ENDCOLOR}"
 	install_cmd git
 	install_cmd curl
 	install_cmd psql postgresql-18
 	install_wkhtmltopdf
 	install_pgvector
-	echo "Dependencies ready."
+	echo "${BLUE}Dependencies ready.${ENDCOLOR}"
 }
 
 
@@ -200,20 +205,20 @@ fetch_git_repositories() {
         git clone git@github.com:odoo/design-themes.git
         git clone git@github.com:odoo/industry.git
 	else
-		echo "  ${home_path}src already exists, skipping clone."
+		echo "${BLUE}  ${home_path}src already exists, skipping clone.${ENDCOLOR}"
 	fi
-	echo "  Switching repositories to master ..."
+	echo "${BLUE}  Switching repositories to master ...${ENDCOLOR}"
     cd "${home_path}src/odoo" && git switch master
     cd "${home_path}src/enterprise" && git switch master
     cd "${home_path}src/design-themes" && git switch master
     cd "${home_path}src/industry" && git switch master
-	echo "  Installing Odoo debian dependencies (setup/debinstall.sh) ..."
+	echo "${BLUE}  Installing Odoo debian dependencies (setup/debinstall.sh) ...${ENDCOLOR}"
 	run sudo "${home_path}src/odoo/setup/debinstall.sh"
 }
 
 
 postgresql_setup() {
-	echo "Configuring PostgreSQL ..."
+	echo "${BLUE}Configuring PostgreSQL ...${ENDCOLOR}"
 	sudo systemctl enable --now postgresql
 	sudo -u postgres createuser -d -R -S odoo
 	sudo -u postgres psql -d template1 -c "CREATE EXTENSION IF NOT EXISTS vector;" # ALL FUTUR DB will get it
@@ -221,16 +226,16 @@ postgresql_setup() {
 
 
 setup_odoorc() {
-	echo "Fetching .odoorc configuration ..."
+	echo "${GREEN}Fetching .odoorc configuration ...${ENDCOLOR}"
 	run curl -fsSL -o /home/odoo/src/.odoorc https://gist.githubusercontent.com/Abridbus/a4c1ada1e8c61c04ab68cc8ddbb827b1/raw/4614022d0c21bbc02f35254d59c5cefcdbedb12d/.odoorc
 }
 
 
 install_mailcatcher() {
-	read -r -p "Need MailCatcher ? It's for having on local a mailing solution. [y/N]: " answer
+	read -r -p "${GREEN}Need MailCatcher ? It's for having on local a mailing solution. [y/N]: ${ENDCOLOR}" answer
 	if [[ "$answer" =~ ^[Yy]$ ]]; then
 		have mailcatcher && return 0
-		echo "  Installing MailCatcher ..."
+		echo "${BLUE}  Installing MailCatcher ...${ENDCOLOR}"
 		run sudo apt-get install -y ruby ruby-dev
 		run sudo gem install mailcatcher
 	fi
@@ -240,12 +245,12 @@ install_mailcatcher() {
 create_database() {
 	local pattern="^[0-9a-zA-Z_-]{1,60}$"
 	while :; do
-		read -r -p "Name of your database: " DB_NAME
+		read -r -p "${GREEN}Name of your database: ${ENDCOLOR}" DB_NAME
 		[[ $DB_NAME =~ $pattern ]] && break
-		echo "Invalid name: only a-z, A-Z, 0-9, _ and - allowed."
+		echo "${RED}Invalid name: only a-z, A-Z, 0-9, _ and - allowed.${ENDCOLOR}"
 	done
 	cd /home/odoo/src/odoo
-	echo "Creating database '$DB_NAME' (a few minutes) ..."
+	echo "${BLUE}Creating database '$DB_NAME' (a few minutes) ...${ENDCOLOR}"
 	run python3 odoo-bin -d "$DB_NAME" -i base --stop-after-init
 }
 
@@ -257,7 +262,7 @@ set_expiration_date() {
 		ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
 		DELETE FROM ir_config_parameter WHERE key = 'database.expiration_reason';
 	SQL
-	echo "Expiration date set on '$DB_NAME'."
+	echo "${BLUE}Expiration date set on '$DB_NAME'.${ENDCOLOR}"
 }
 
 
@@ -271,7 +276,7 @@ normal_installation() {
 	setup_odoorc
 	create_database
 	set_expiration_date
-	echo "Installation complete. Full log: $LOG"
+	echo "${BLUE}Installation complete. Full log: $LOG${ENDCOLOR}"
 }
 
 
@@ -287,18 +292,18 @@ advanced_installation() {
 	create_database
 	setup_odoorc
 	set_expiration_date
-	echo "Installation complete. Full log: $LOG"
+	echo "${BLUE}Installation complete. Full log: $LOG${ENDCOLOR}"
 }
 
 menu(){
-	echo "1) Complete Install  2) Check Tools  3) Advanced Install  4) Exit"
-	read -rp "Select option [1-4]: " choice
+	echo "${BLUE}1) Complete Install  2) Check Tools  3) Advanced Install  4) Exit${ENDCOLOR}"
+	read -rp "${GREEN}Select option [1-4]: ${ENDCOLOR}" choice
 	case "$choice" in
 	  1) normal_installation;;
 	  2) check_deps ;;
 	  3) advanced_installation;;
 	  4) exit 0 ;;
-	  *) echo "Invalid option"; menu ;;
+	  *) echo "${RED}Invalid option${ENDCOLOR}"; menu ;;
 	esac
 }
 
