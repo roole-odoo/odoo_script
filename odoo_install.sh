@@ -10,7 +10,7 @@ BLUE=$'\e[34m'
 ENDCOLOR=$'\e[0m'
 
 # Create a LOG file a each run
-sudo -v touch "$LOG" && sudo chown "$USER" "$LOG"
+sudo -v && sudo touch "$LOG" && sudo chown "$USER" "$LOG"
 : >"$LOG"
 
 # Put the outuput of heavy cmd into LOG  (often for apt)
