@@ -50,30 +50,30 @@ check_ssh_key() {
 	local ssh_pub_key_path="/home/odoo/.ssh/id_ed25519.pub"
 	user_gram="$(cut -d '-' -f 1 </etc/hostname)"
 	if [[ -f "${ssh_pub_key_path}" ]]; then
-		echo "${BLUE}A SSH key is already created (${ssh_key_path}), be sure it's linked to your GitHub profile.${ENDCOLOR}"
-		echo "${BLUE}Data to be checked in GitHub user profile [https://github.com/settings/keys]:${ENDCOLOR}"
+		echo "${BLUE}There is already an exisiting SSH key on this system(${ssh_key_path}) ${ENDCOLOR}"
+		echo "${BLUE}Please make sure the public key below is referenced in your GitHub profile [https://github.com/settings/keys]:${ENDCOLOR}"
 		echo "$(<$ssh_pub_key_path)"
 	else
 		echo "${BLUE}SSH key not found. Generating new ed25519 SSH key for '${user_gram}@odoo.com'.${ENDCOLOR}"
 		echo "${BLUE}Path to add the key: ${ssh_key_path}${ENDCOLOR}"
 		ssh-keygen -t ed25519 -C "${user_gram}@odoo.com" -f "$ssh_key_path"
-		echo "${GREEN}Add the data below to your GitHub user profile https://github.com/settings/keys:${ENDCOLOR}"
+		echo "${BLUE}Please add the public key below to your GitHub profile [https://github.com/settings/keys]:${ENDCOLOR}"
 		echo "$(<$ssh_pub_key_path)"
 	fi
 	while true; do
-		read -r -p "${GREEN}Key added to your GitHub account ? [y/N]: ${ENDCOLOR}" answer
+		read -r -p "${GREEN}Have you added your public key to your GitHub account ? [y/N]: ${ENDCOLOR}" answer
 		if [[ "$answer" =~ ^[Yy]$ ]]; then
 			echo "${BLUE}Starting the installation in 5s ...${ENDCOLOR}"
 			sleep 5
 		else
-			echo "${BLUE}Relaunch this script once it's done.${ENDCOLOR}"
+			echo "${BLUE}Please launch this script again once your key have been added to your Github account${ENDCOLOR}"
 			exit 0
 		fi
 		if git ls-remote git@github.com:odoo/enterprise.git HEAD >/dev/null 2>&1; then
-			echo "${BLUE}GitHub SSH access OK.${ENDCOLOR}"
+			echo "${BLUE}GitHub SSH access validated${ENDCOLOR}"
 			break
 		fi
-		echo "${RED}ERROR: GitHub SSH key not configured yet.${ENDCOLOR}"
+		echo "${RED}ERROR: GitHub SSH access could not be validated. Please check that you entered the right key into your Github account${ENDCOLOR}"
 	done
 }
 
@@ -81,7 +81,7 @@ check_ubuntu() {
 	. /etc/os-release # Get ID and verison varialbe
 	echo "${BLUE}System: $ID $VERSION_ID (user $USER)${ENDCOLOR}"
 	if [[ "$ID" != "ubuntu" ]]; then
-		echo "${RED}ERROR: expected ubuntu, found: $ID. OS not supported. Exit...${ENDCOLOR}"
+		echo "${RED}ERROR: expected Ubuntu, found: $ID. OS not supported. Exit...${ENDCOLOR}"
 		exit 1
 	fi
 	if [[ "$VERSION_ID" != "24.04" && "$VERSION_ID" != "26.04" ]]; then
@@ -136,7 +136,7 @@ install_pgvector() {
 }
 
 install_rtlcss() {
-	read -r -p "${GREEN}Need RTLCSS ? It's for the Odoo interface for right-to-left languages (Arabic, Hebrew). Only needed if you work on those. [y/N]: ${ENDCOLOR}" answer
+	read -r -p "${GREEN}Need RTLCSS ? It's for the Odoo interface for right-to-left languages (Arabic, Hebrew). Only needed if you work with those [y/N]: ${ENDCOLOR}" answer
 	if [[ "$answer" =~ ^[Yy]$ ]]; then
 		install_cmd npm
 		echo "${BLUE}  Installing rtlcss ...${ENDCOLOR}"
@@ -164,9 +164,9 @@ check_deps() {
 	. /etc/os-release
 	log "OS       : $ID $VERSION_ID"
 	log "User     : $USER"
-	log "--- 2. python ---"
+	log "--- 2. Python ---"
 	check_cmd python3
-	log "--- 3. dependencies ---"
+	log "--- 3. Dependencies ---"
 	check_cmd git
 	check_cmd curl
 	check_cmd psql
@@ -200,7 +200,8 @@ fetch_git_repositories() {
 	cd "${home_path}src/enterprise" && git switch master
 	cd "${home_path}src/design-themes" && git switch master
 	cd "${home_path}src/industry" && git switch master
-	echo "${BLUE}  Installing Odoo debian dependencies (setup/debinstall.sh) ...${ENDCOLOR}"
+	echo "${BLUE}  Installing Odoo debian dependencies (setup/debinstall.sh)${ENDCOLOR}"
+	echo "${BLUE}  It might take a while ...${ENDCOLOR}"
 	run sudo "${home_path}src/odoo/setup/debinstall.sh"
 }
 
