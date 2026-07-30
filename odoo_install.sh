@@ -208,7 +208,11 @@ fetch_git_repositories() {
 postgresql_setup() {
 	echo "${BLUE}Configuring PostgreSQL ...${ENDCOLOR}"
 	sudo systemctl enable --now postgresql
-	sudo -u postgres createuser -d -R -S odoo
+	if sudo -u postgres psql -t -c '\du' | cut -f 1 -d \| | grep -qw odoo; then  
+                echo "${BLUE} Odoo PostgreSQL User already exists. Skipping.${ENDCOLOR}"
+        else
+                sudo -u postgres createuser -d -R -S odoo
+        fi
 	sudo -u postgres psql -d template1 -c "CREATE EXTENSION IF NOT EXISTS vector;" # ALL FUTUR DB will get it
 }
 
@@ -257,7 +261,7 @@ normal_installation() {
 	fetch_git_repositories
 	postgresql_setup
 	setup_odoorc
-	create_database:q
+	create_database
 	set_expiration_date
 	echo "${BLUE}Installation complete. Full log: $LOG${ENDCOLOR}"
 	echo "${BLUE}To start the new DB enter those commands:${ENDCOLOR}"
