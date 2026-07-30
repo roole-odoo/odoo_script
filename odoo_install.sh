@@ -185,7 +185,6 @@ check_deps() {
 
 fetch_git_repositories() {
 	local home_path="/home/odoo/"
-	local repo
 	if [[ ! -d "${home_path}src" ]]; then
 		mkdir -p "${home_path}src" && cd "${home_path}src"
 		git clone git@github.com:odoo/odoo.git
@@ -208,11 +207,11 @@ fetch_git_repositories() {
 postgresql_setup() {
 	echo "${BLUE}Configuring PostgreSQL ...${ENDCOLOR}"
 	sudo systemctl enable --now postgresql
-	if sudo -u postgres psql -t -c '\du' | cut -f 1 -d \| | grep -qw odoo; then  
-                echo "${BLUE} Odoo PostgreSQL User already exists. Skipping.${ENDCOLOR}"
-        else
-                sudo -u postgres createuser -d -R -S odoo
-        fi
+	if sudo -u postgres psql -t -c '\du' | cut -f 1 -d \| | grep -qw odoo; then
+		echo "${BLUE} Odoo PostgreSQL User already exists. Skipping.${ENDCOLOR}"
+	else
+		sudo -u postgres createuser -d -R -S odoo
+	fi
 	sudo -u postgres psql -d template1 -c "CREATE EXTENSION IF NOT EXISTS vector;" # ALL FUTUR DB will get it
 }
 
@@ -265,7 +264,7 @@ normal_installation() {
 	set_expiration_date
 	echo "${BLUE}Installation complete. Full log: $LOG${ENDCOLOR}"
 	echo "${BLUE}To start the new DB enter those commands:${ENDCOLOR}"
-	echo "${BLUE}	cd /home/odoo/src/odoo && python3 odoo-bin -d odoo -i base ${ENDCOLOR}"
+	echo "${BLUE}	cd /home/odoo/src/odoo && python3 ./odoo-bin -d ${DB_NAME} ${ENDCOLOR}"
 	echo "${BLUE}This will start your DB, that you will be able to manage on http://localhost:8069/web/database/manager ${ENDCOLOR}"
 	echo "${BLUE}To end the DB, press CTRL + c${ENDCOLOR}"
 
@@ -285,7 +284,7 @@ advanced_installation() {
 	set_expiration_date
 	echo "${BLUE}Installation complete. Full log: $LOG${ENDCOLOR}"
 	echo "${BLUE}To start the new DB enter those commands:${ENDCOLOR}"
-	echo "${BLUE}	cd /home/odoo/src/odoo && python3 odoo-bin -d odoo -i base ${ENDCOLOR}"
+	echo "${BLUE}	cd /home/odoo/src/odoo && python3 ./odoo-bin -d ${DB_NAME} ${ENDCOLOR}"
 	echo "${BLUE}This will start your DB, that you will be able to manage on http://localhost:8069/web/database/manager ${ENDCOLOR}"
 	echo "${BLUE}To end the DB, press CTRL + c${ENDCOLOR}"
 }
