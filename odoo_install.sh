@@ -257,9 +257,14 @@ normal_installation() {
 	fetch_git_repositories
 	postgresql_setup
 	setup_odoorc
-	create_database
+	create_database:q
 	set_expiration_date
 	echo "${BLUE}Installation complete. Full log: $LOG${ENDCOLOR}"
+	echo "${BLUE}To start the new DB enter those commands:${ENDCOLOR}"
+	echo "${BLUE}	cd /home/odoo/src/odoo && python3 odoo-bin -d odoo -i base ${ENDCOLOR}"
+	echo "${BLUE}This will start your DB, that you will be able to manage on http://localhost:8069/web/database/manager ${ENDCOLOR}"
+	echo "${BLUE}To end the DB, press CTRL + c${ENDCOLOR}"
+
 }
 
 advanced_installation() {
@@ -275,9 +280,16 @@ advanced_installation() {
 	setup_odoorc
 	set_expiration_date
 	echo "${BLUE}Installation complete. Full log: $LOG${ENDCOLOR}"
+	echo "${BLUE}To start the new DB enter those commands:${ENDCOLOR}"
+	echo "${BLUE}	cd /home/odoo/src/odoo && python3 odoo-bin -d odoo -i base ${ENDCOLOR}"
+	echo "${BLUE}This will start your DB, that you will be able to manage on http://localhost:8069/web/database/manager ${ENDCOLOR}"
+	echo "${BLUE}To end the DB, press CTRL + c${ENDCOLOR}"
 }
 
 menu() {
+	echo "${BLUE}Odoo Local Database installer${ENDCOLOR}"
+	echo "${BLUE}#############################${ENDCOLOR}"
+	echo "${BLUE}Documentation: https://www.odoo.com/odoo/knowledge/18175${ENDCOLOR}"
 	echo "${BLUE}1) Complete Install  2) Check Tools  3) Advanced Install  4) Exit${ENDCOLOR}"
 	read -rp "${GREEN}Select option [1-4]: ${ENDCOLOR}" choice
 	case "$choice" in
