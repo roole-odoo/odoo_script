@@ -3,7 +3,6 @@ set -Eeuo pipefail
 DEBUG_FILE="/home/odoo/Desktop/odoo_install.debug"
 LOG="/var/log/odoo_installation.log"
 DB_NAME=""
-
 RED=$'\e[31m'
 GREEN=$'\e[32m'
 BLUE=$'\e[34m'
@@ -46,6 +45,7 @@ install_cmd() {
 
 check_ssh_key() {
 	local user_gram
+	local ssh_known_hosts_path="/home/odoo/.ssh/known_hosts"
 	local ssh_key_path="/home/odoo/.ssh/id_ed25519"
 	local ssh_pub_key_path="/home/odoo/.ssh/id_ed25519.pub"
 	user_gram="$(cut -d '-' -f 1 </etc/hostname)"
@@ -60,6 +60,12 @@ check_ssh_key() {
 		echo "${BLUE}Please add the public key below to your GitHub profile [https://github.com/settings/keys]:${ENDCOLOR}"
 		echo "$(<$ssh_pub_key_path)"
 	fi
+	echo "${BLUE}Adding Github fingerprints to known_hosts file if needed${ENDCOLOR}"
+		if [[ -f "${ssh_known_hosts_path}" ]] && grep -qw "github.com" $ssh_known_hosts_path; then
+			echo "${BLUE}Fingerprint already present, nothing to do${ENDCOLOR}"
+		else
+			curl --silent https://api.github.com/meta | jq --raw-output '"github.com "+.ssh_keys[]' >> $ssh_known_hosts_path #https://docs.github.com/en/rest/meta/meta?apiVersion=2026-03-10#get-github-meta-information
+		fi
 	while true; do
 		read -r -p "${GREEN}Have you added your public key to your GitHub account ? [y/N]: ${ENDCOLOR}" answer
 		if [[ "$answer" =~ ^[Yy]$ ]]; then
