@@ -3,6 +3,7 @@ set -Eeuo pipefail
 DEBUG_FILE="/home/odoo/Desktop/odoo_install.debug"
 LOG="/var/log/odoo_installation.log"
 DB_NAME=""
+ALIAS_NAME="odoo-localDB"
 
 RED=$'\e[31m'
 GREEN=$'\e[32m'
@@ -252,6 +253,16 @@ set_expiration_date() {
 	echo "${BLUE}Expiration date set on '$DB_NAME'.${ENDCOLOR}"
 }
 
+add_alias(){
+	if grep -qw $ALIAS_NAME /home/odoo/.bashrc; then
+ 		echo "${BLUE}Alias already exists. Skipping.${ENDCOLOR}"
+	else
+		echo "${BLUE}Adding a bash alias${ENDCOLOR}"
+		echo "alias $ALIAS_NAME='cd /home/odoo/src/odoo; ./odoo-bin -d ${DB_NAME}'" >> /home/odoo/.bashrc
+		source /home/odoo/.bashrc
+	fi
+}
+
 normal_installation() {
 	check_ubuntu
 	check_python
@@ -262,9 +273,10 @@ normal_installation() {
 	setup_odoorc
 	create_database
 	set_expiration_date
+	add_alias
 	echo "${BLUE}Installation complete. Full log: $LOG${ENDCOLOR}"
-	echo "${BLUE}To start the new DB enter those commands:${ENDCOLOR}"
-	echo "${BLUE}	cd /home/odoo/src/odoo && python3 ./odoo-bin -d ${DB_NAME} ${ENDCOLOR}"
+	echo "${BLUE}To start the new DB enter this command:${ENDCOLOR}"
+	echo "${BLUE}	${ALIAS_NAME} ${ENDCOLOR}"
 	echo "${BLUE}This will start your DB, that you will be able to manage on http://localhost:8069/web/database/manager ${ENDCOLOR}"
 	echo "${BLUE}To end the DB, press CTRL + c${ENDCOLOR}"
 
@@ -282,9 +294,10 @@ advanced_installation() {
 	create_database
 	setup_odoorc
 	set_expiration_date
+	add_alias
 	echo "${BLUE}Installation complete. Full log: $LOG${ENDCOLOR}"
-	echo "${BLUE}To start the new DB enter those commands:${ENDCOLOR}"
-	echo "${BLUE}	cd /home/odoo/src/odoo && python3 ./odoo-bin -d ${DB_NAME} ${ENDCOLOR}"
+	echo "${BLUE}To start the new DB enter this command:${ENDCOLOR}"
+	echo "${BLUE}	${ALIAS_NAME} ${ENDCOLOR}"
 	echo "${BLUE}This will start your DB, that you will be able to manage on http://localhost:8069/web/database/manager ${ENDCOLOR}"
 	echo "${BLUE}To end the DB, press CTRL + c${ENDCOLOR}"
 }
