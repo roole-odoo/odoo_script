@@ -217,7 +217,7 @@ postgresql_setup() {
 
 setup_odoorc() {
 	echo "${GREEN}Fetching .odoorc configuration ...${ENDCOLOR}"
-	run curl -fsSL -o /home/odoo/src/.odoorc https://gist.githubusercontent.com/Abridbus/a4c1ada1e8c61c04ab68cc8ddbb827b1/raw/4614022d0c21bbc02f35254d59c5cefcdbedb12d/.odoorc
+	run curl -fsSL -o /home/odoo/.odoorc https://gist.githubusercontent.com/Abridbus/a4c1ada1e8c61c04ab68cc8ddbb827b1/raw/4614022d0c21bbc02f35254d59c5cefcdbedb12d/.odoorc
 }
 
 install_mailcatcher() {
