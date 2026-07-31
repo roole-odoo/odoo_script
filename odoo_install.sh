@@ -266,11 +266,12 @@ add_alias(){ # TODO find a way to add this alias in the terminal used by the use
 
 add_desktop_shortcuts(){
 	echo "${BLUE}Adding desktop shortcuts${ENDCOLOR}"
+
 	echo "[Desktop Entry]" > ${MANAGER_SHORTCUT_PATH} #Not appending so that we can re-run the script and rewrite the shortcut everytime
 	echo "Icon=text-html" >> ${MANAGER_SHORTCUT_PATH}
 	echo "Name=Odoo - Local DB manager" >> ${MANAGER_SHORTCUT_PATH}
-	echo "Type=Link" >> ${MANAGER_SHORTCUT_PATH}
-	echo "URL[\$e]=http://localhost:8069/web/database/manager" >> ${MANAGER_SHORTCUT_PATH}
+	echo "Type=Application" >> ${MANAGER_SHORTCUT_PATH}
+	echo "Exec= xdg-open http://localhost:8069/web/database/manager" >> ${MANAGER_SHORTCUT_PATH}
 
 	echo "[Desktop Entry]" > ${ODOO_SHORTCUT_PATH}
 	echo "Exec=/home/odoo/src/odoo/odoo-bin" >> ${ODOO_SHORTCUT_PATH}
