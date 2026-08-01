@@ -3,6 +3,10 @@ set -Eeuo pipefail
 DEBUG_FILE="/home/odoo/Desktop/odoo_install.debug"
 LOG="/var/log/odoo_installation.log"
 DB_NAME=""
+ALIAS_NAME="odoo-localDB"
+MANAGER_SHORTCUT_PATH="/home/odoo/Desktop/odoo_local_databases_manager.desktop"
+ODOO_SHORTCUT_PATH="/home/odoo/Desktop/odoo_launcher.desktop"
+
 RED=$'\e[31m'
 GREEN=$'\e[32m'
 BLUE=$'\e[34m'
@@ -258,6 +262,35 @@ set_expiration_date() {
 	echo "${BLUE}Expiration date set on '$DB_NAME'.${ENDCOLOR}"
 }
 
+add_alias(){ # TODO find a way to add this alias in the terminal used by the user
+	if grep -qw $ALIAS_NAME /home/odoo/.bashrc; then
+ 		echo "${BLUE}Alias already exists. Skipping.${ENDCOLOR}"
+	else
+		echo "${BLUE}Adding a bash alias${ENDCOLOR}"
+		echo "alias $ALIAS_NAME='cd /home/odoo/src/odoo; ./odoo-bin -d ${DB_NAME}'" >> /home/odoo/.bashrc
+	fi
+}
+
+add_desktop_shortcuts(){
+	echo "${BLUE}Adding desktop shortcuts${ENDCOLOR}"
+
+	echo "[Desktop Entry]" > ${MANAGER_SHORTCUT_PATH} #Not appending so that we can re-run the script and rewrite the shortcut everytime
+	echo "Icon=text-html" >> ${MANAGER_SHORTCUT_PATH}
+	echo "Name=Odoo - Local DB manager" >> ${MANAGER_SHORTCUT_PATH}
+	echo "Type=Application" >> ${MANAGER_SHORTCUT_PATH}
+	echo "Exec= xdg-open http://localhost:8069/web/database/manager" >> ${MANAGER_SHORTCUT_PATH}
+
+	echo "[Desktop Entry]" > ${ODOO_SHORTCUT_PATH}
+	echo "Exec=/home/odoo/src/odoo/odoo-bin" >> ${ODOO_SHORTCUT_PATH}
+	echo "GenericName=Launch Odoo Local DB" >> ${ODOO_SHORTCUT_PATH}
+	echo "Icon=system-run" >> ${ODOO_SHORTCUT_PATH}
+	echo "Name=Launch Odoo Local DB" >> ${ODOO_SHORTCUT_PATH}
+	echo "StartupNotify=true" >> ${ODOO_SHORTCUT_PATH}
+	echo "Terminal=true" >> ${ODOO_SHORTCUT_PATH}
+	echo "Type=Application" >> ${ODOO_SHORTCUT_PATH}
+
+}
+
 normal_installation() {
 	check_ubuntu
 	check_python
@@ -268,12 +301,13 @@ normal_installation() {
 	setup_odoorc
 	create_database
 	set_expiration_date
+	add_alias
+	add_desktop_shortcuts
 	echo "${BLUE}Installation complete. Full log: $LOG${ENDCOLOR}"
-	echo "${BLUE}To start the new DB enter those commands:${ENDCOLOR}"
-	echo "${BLUE}	cd /home/odoo/src/odoo && python3 ./odoo-bin -d ${DB_NAME} ${ENDCOLOR}"
-	echo "${BLUE}This will start your DB, that you will be able to manage on http://localhost:8069/web/database/manager ${ENDCOLOR}"
+	echo "${BLUE}To start the new DB enter this command in a new terminal:${ENDCOLOR}"
+	echo "${BLUE}	${ALIAS_NAME} ${ENDCOLOR}"
+	echo "${BLUE}This will start your DB, that you will be able to manage on http://localhost:8069/web/database/manager (shortcut added to your desktop) ${ENDCOLOR}"
 	echo "${BLUE}To end the DB, press CTRL + c${ENDCOLOR}"
-
 }
 
 advanced_installation() {
@@ -288,10 +322,12 @@ advanced_installation() {
 	create_database
 	setup_odoorc
 	set_expiration_date
+	add_alias
+	add_desktop_shortcuts
 	echo "${BLUE}Installation complete. Full log: $LOG${ENDCOLOR}"
-	echo "${BLUE}To start the new DB enter those commands:${ENDCOLOR}"
-	echo "${BLUE}	cd /home/odoo/src/odoo && python3 ./odoo-bin -d ${DB_NAME} ${ENDCOLOR}"
-	echo "${BLUE}This will start your DB, that you will be able to manage on http://localhost:8069/web/database/manager ${ENDCOLOR}"
+	echo "${BLUE}To start the new DB enter this command in a new terminal:${ENDCOLOR}"
+	echo "${BLUE}	${ALIAS_NAME} ${ENDCOLOR}"
+	echo "${BLUE}This will start your DB, that you will be able to manage on http://localhost:8069/web/database/manager (shortcut added to your desktop)${ENDCOLOR}"
 	echo "${BLUE}To end the DB, press CTRL + c${ENDCOLOR}"
 }
 
