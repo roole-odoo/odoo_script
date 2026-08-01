@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
-DEBUG_FILE="/home/odoo/Desktop/odoo_install.debug"
+DEBUG_FILE="$HOME/Desktop/odoo_install.debug"
 LOG="/var/log/odoo_installation.log"
 DB_NAME=""
 ALIAS_NAME="odoo-localDB"
-MANAGER_SHORTCUT_PATH="/home/odoo/Desktop/odoo_local_databases_manager.desktop"
-ODOO_SHORTCUT_PATH="/home/odoo/Desktop/odoo_launcher.desktop"
+MANAGER_SHORTCUT_PATH="$HOME/Desktop/odoo_local_databases_manager.desktop"
+ODOO_SHORTCUT_PATH="$HOME/Desktop/odoo_launcher.desktop"
 
 RED=$'\e[31m'
 GREEN=$'\e[32m'
@@ -49,9 +49,9 @@ install_cmd() {
 
 check_ssh_key() {
 	local user_gram
-	local ssh_known_hosts_path="/home/odoo/.ssh/known_hosts"
-	local ssh_key_path="/home/odoo/.ssh/id_ed25519"
-	local ssh_pub_key_path="/home/odoo/.ssh/id_ed25519.pub"
+	local ssh_known_hosts_path="$HOME/.ssh/known_hosts"
+	local ssh_key_path="$HOME/.ssh/id_ed25519"
+	local ssh_pub_key_path="$HOME/.ssh/id_ed25519.pub"
 	user_gram="$(cut -d '-' -f 1 </etc/hostname)"
 	if [[ -f "${ssh_pub_key_path}" ]]; then
 		echo "${BLUE}There is already an exisiting SSH key on this system(${ssh_key_path}) ${ENDCOLOR}"
@@ -182,11 +182,11 @@ check_deps() {
 	check_cmd psql
 	check_cmd wkhtmltopdf
 	log "--- 4. Folders ---"
-	exists /home/odoo/src
-	repo_check /home/odoo/src/odoo
-	repo_check /home/odoo/src/enterprise
-	repo_check /home/odoo/src/design-themes
-	repo_check /home/odoo/src/industry
+	exists $HOME/src
+	repo_check $HOME/src/odoo
+	repo_check $HOME/src/enterprise
+	repo_check $HOME/src/design-themes
+	repo_check $HOME/src/industry
 	log "--- 6. Extra dependencies ---"
 	check_cmd rtlcss
 	check_cmd mailcatcher
@@ -194,24 +194,43 @@ check_deps() {
 }
 
 fetch_git_repositories() {
-	local home_path="/home/odoo/"
-	if [[ ! -d "${home_path}src" ]]; then
-		mkdir -p "${home_path}src" && cd "${home_path}src"
+	local home_path="$HOME/src"
+	mkdir -p "${home_path}"
+	cd "${home_path}"
+
+	if [[ ! -d "${home_path}/odoo" ]]; then
 		git clone git@github.com:odoo/odoo.git
+	else
+		echo "${BLUE}  ${home_path}/odoo already exists, skipping clone.${ENDCOLOR}"
+	fi
+
+	if [[ ! -d "${home_path}/enterprise" ]]; then
 		git clone git@github.com:odoo/enterprise.git
+	else
+		echo "${BLUE}  ${home_path}/enterprise already exists, skipping clone.${ENDCOLOR}"
+	fi
+
+	if [[ ! -d "${home_path}/design-themes" ]]; then
 		git clone git@github.com:odoo/design-themes.git
+	else
+		echo "${BLUE}  ${home_path}/design-themes already exists, skipping clone.${ENDCOLOR}"
+	fi
+
+	if [[ ! -d "${home_path}/industry" ]]; then
 		git clone git@github.com:odoo/industry.git
 	else
-		echo "${BLUE}  ${home_path}src already exists, skipping clone.${ENDCOLOR}"
+		echo "${BLUE}  ${home_path}/industry already exists, skipping clone.${ENDCOLOR}"
 	fi
-	echo "${BLUE}  Switching repositories to master ...${ENDCOLOR}"
-	cd "${home_path}src/odoo" && git switch master
-	cd "${home_path}src/enterprise" && git switch master
-	cd "${home_path}src/design-themes" && git switch master
-	cd "${home_path}src/industry" && git switch master
+
+	echo "${BLUE}  Switching repositories to master and update it ...${ENDCOLOR}"
+	cd "${home_path}/odoo" && git switch master && git pull --rebase
+	cd "${home_path}/enterprise" && git switch master && git pull --rebase
+	cd "${home_path}/design-themes" && git switch master && git pull --rebase
+	cd "${home_path}/industry" && git switch master && git pull --rebase
 	echo "${BLUE}  Installing Odoo debian dependencies (setup/debinstall.sh)${ENDCOLOR}"
 	echo "${BLUE}  It might take a while ...${ENDCOLOR}"
-	run sudo "${home_path}src/odoo/setup/debinstall.sh"
+	run sudo "${home_path}/odoo/setup/debinstall.sh"
+	return 0
 }
 
 postgresql_setup() {
@@ -227,7 +246,7 @@ postgresql_setup() {
 
 setup_odoorc() {
 	echo "${GREEN}Fetching .odoorc configuration ...${ENDCOLOR}"
-	run curl -fsSL -o /home/odoo/.odoorc https://gist.githubusercontent.com/Abridbus/a4c1ada1e8c61c04ab68cc8ddbb827b1/raw/4614022d0c21bbc02f35254d59c5cefcdbedb12d/.odoorc
+	run curl -fsSL -o $HOME/.odoorc https://gist.githubusercontent.com/Abridbus/a4c1ada1e8c61c04ab68cc8ddbb827b1/raw/4614022d0c21bbc02f35254d59c5cefcdbedb12d/.odoorc
 }
 
 install_mailcatcher() {
@@ -247,7 +266,7 @@ create_database() {
 		[[ $DB_NAME =~ $pattern ]] && break
 		echo "${RED}Invalid name: only a-z, A-Z, 0-9, _ and - allowed.${ENDCOLOR}"
 	done
-	cd /home/odoo/src/odoo
+	cd $HOME/src/odoo
 	echo "${BLUE}Creating database '$DB_NAME' (a few minutes) ...${ENDCOLOR}"
 	run python3 odoo-bin -d "$DB_NAME" -i base --stop-after-init
 }
@@ -262,36 +281,44 @@ set_expiration_date() {
 	echo "${BLUE}Expiration date set on '$DB_NAME'.${ENDCOLOR}"
 }
 
+check_memory(){
+	# check laptop memory, if <= 16G change some github params to prevent clone error "fatal: fetch-pack: Invalid index-pack output"
+	if [ $(awk '/MemTotal/ {print $2}' /proc/meminfo) -le 16777216 ]; then
+		git config --global pack.threads 1
+		git config --global http.postBuffer 524288000
+	fi
+}
+
 add_alias(){ # TODO find a way to add this alias in the terminal used by the user
-	if grep -qw $ALIAS_NAME /home/odoo/.bashrc; then
+	if grep -qw $ALIAS_NAME $HOME/.bashrc; then
  		echo "${BLUE}Alias already exists. Skipping.${ENDCOLOR}"
 	else
 		echo "${BLUE}Adding a bash alias${ENDCOLOR}"
-		echo "alias $ALIAS_NAME='cd /home/odoo/src/odoo; ./odoo-bin -d ${DB_NAME}'" >> /home/odoo/.bashrc
+		echo "alias $ALIAS_NAME='cd $HOME/src/odoo; ./odoo-bin -d ${DB_NAME}'" >> $HOME/.bashrc
 	fi
 }
 
 add_desktop_shortcuts(){
 	echo "${BLUE}Adding desktop shortcuts${ENDCOLOR}"
 
-	echo "[Desktop Entry]" > ${MANAGER_SHORTCUT_PATH} #Not appending so that we can re-run the script and rewrite the shortcut everytime
-	echo "Icon=text-html" >> ${MANAGER_SHORTCUT_PATH}
-	echo "Name=Odoo - Local DB manager" >> ${MANAGER_SHORTCUT_PATH}
-	echo "Type=Application" >> ${MANAGER_SHORTCUT_PATH}
-	echo "Exec= xdg-open http://localhost:8069/web/database/manager" >> ${MANAGER_SHORTCUT_PATH}
+	echo "[Desktop Entry]" > "${MANAGER_SHORTCUT_PATH}" #Not appending so that we can re-run the script and rewrite the shortcut everytime
+	echo "Icon=text-html" >> "${MANAGER_SHORTCUT_PATH}"
+	echo "Name=Odoo - Local DB manager" >> "${MANAGER_SHORTCUT_PATH}"
+	echo "Type=Application" >> "${MANAGER_SHORTCUT_PATH}"
+	echo "Exec= xdg-open http://localhost:8069/web/database/manager" >> "${MANAGER_SHORTCUT_PATH}"
 
-	echo "[Desktop Entry]" > ${ODOO_SHORTCUT_PATH}
-	echo "Exec=/home/odoo/src/odoo/odoo-bin" >> ${ODOO_SHORTCUT_PATH}
-	echo "GenericName=Launch Odoo Local DB" >> ${ODOO_SHORTCUT_PATH}
-	echo "Icon=system-run" >> ${ODOO_SHORTCUT_PATH}
-	echo "Name=Launch Odoo Local DB" >> ${ODOO_SHORTCUT_PATH}
-	echo "StartupNotify=true" >> ${ODOO_SHORTCUT_PATH}
-	echo "Terminal=true" >> ${ODOO_SHORTCUT_PATH}
-	echo "Type=Application" >> ${ODOO_SHORTCUT_PATH}
-
+	echo "[Desktop Entry]" > "${ODOO_SHORTCUT_PATH}"
+	echo "Exec=$HOME/src/odoo/odoo-bin" >> "${ODOO_SHORTCUT_PATH}"
+	echo "GenericName=Launch Odoo Local DB" >> "${ODOO_SHORTCUT_PATH}"
+	echo "Icon=system-run" >> "${ODOO_SHORTCUT_PATH}"
+	echo "Name=Launch Odoo Local DB" >> "${ODOO_SHORTCUT_PATH}"
+	echo "StartupNotify=true" >> "${ODOO_SHORTCUT_PATH}"
+	echo "Terminal=true" >> "${ODOO_SHORTCUT_PATH}"
+	echo "Type=Application" >> "${ODOO_SHORTCUT_PATH}"
 }
 
 normal_installation() {
+	check_memory
 	check_ubuntu
 	check_python
 	install_deps
@@ -311,6 +338,7 @@ normal_installation() {
 }
 
 advanced_installation() {
+	check_memory
 	check_ubuntu
 	check_python
 	install_deps
