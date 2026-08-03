@@ -23,7 +23,7 @@ run() { "$@" >>"$LOG" 2>&1; }
 trap 'echo; echo "FAILED (line $LINENO). Last lines of $LOG:"; tail -n 15 "$LOG"' ERR
 
 # Echo + in debug file
-log() { echo "$*" | tee -a "$DEBUG_FILE"; }
+log() { echo "$(date) - $*" | tee -a "$DEBUG_FILE"; }
 
 ok() { log "${GREEN}[  OK  ] $*${ENDCOLOR}"; }
 
@@ -194,30 +194,31 @@ check_deps() {
 }
 
 fetch_git_repositories() {
+	# clone ony master branch to save disk space and cloning time
 	local home_path="$HOME/src"
 	mkdir -p "${home_path}"
 	cd "${home_path}"
 
 	if [[ ! -d "${home_path}/odoo" ]]; then
-		git clone git@github.com:odoo/odoo.git
+		git clone --single-branch --branch master git@github.com:odoo/odoo.git
 	else
 		echo "${BLUE}  ${home_path}/odoo already exists, skipping clone.${ENDCOLOR}"
 	fi
 
 	if [[ ! -d "${home_path}/enterprise" ]]; then
-		git clone git@github.com:odoo/enterprise.git
+		git clone --single-branch --branch master git@github.com:odoo/enterprise.git
 	else
 		echo "${BLUE}  ${home_path}/enterprise already exists, skipping clone.${ENDCOLOR}"
 	fi
 
 	if [[ ! -d "${home_path}/design-themes" ]]; then
-		git clone git@github.com:odoo/design-themes.git
+		git clone --single-branch --branch master git@github.com:odoo/design-themes.git
 	else
 		echo "${BLUE}  ${home_path}/design-themes already exists, skipping clone.${ENDCOLOR}"
 	fi
 
 	if [[ ! -d "${home_path}/industry" ]]; then
-		git clone git@github.com:odoo/industry.git
+		git clone --single-branch --branch master git@github.com:odoo/industry.git
 	else
 		echo "${BLUE}  ${home_path}/industry already exists, skipping clone.${ENDCOLOR}"
 	fi
@@ -262,13 +263,16 @@ install_mailcatcher() {
 create_database() {
 	local pattern="^[0-9a-zA-Z_-]{1,60}$"
 	while :; do
-		read -r -p "${GREEN}Name of your database: ${ENDCOLOR}" DB_NAME
+		read -r -p "${GREEN}Name of your database you want to create (leave empty to create default one named odoo): ${ENDCOLOR}" DB_NAME
+		[[ -z "$DB_NAME" ]] && DB_NAME="odoo"
 		[[ $DB_NAME =~ $pattern ]] && break
 		echo "${RED}Invalid name: only a-z, A-Z, 0-9, _ and - allowed.${ENDCOLOR}"
 	done
-	cd $HOME/src/odoo
-	echo "${BLUE}Creating database '$DB_NAME' (a few minutes) ...${ENDCOLOR}"
-	run python3 odoo-bin -d "$DB_NAME" -i base --stop-after-init
+	if [[ -n "$DB_NAME" ]]; then
+		cd $HOME/src/odoo
+		echo "${BLUE}Creating database '$DB_NAME' (a few minutes) ...${ENDCOLOR}"
+		run python3 odoo-bin -d "$DB_NAME" -i base --stop-after-init
+	fi
 }
 
 set_expiration_date() {
@@ -359,17 +363,27 @@ advanced_installation() {
 	echo "${BLUE}To end the DB, press CTRL + c${ENDCOLOR}"
 }
 
+update_installation(){
+	check_memory
+	check_ubuntu
+	check_python
+	install_deps
+	check_ssh_key
+	fetch_git_repositories
+}
+
 menu() {
 	echo "${BLUE}Odoo Local Database installer${ENDCOLOR}"
 	echo "${BLUE}#############################${ENDCOLOR}"
 	echo "${BLUE}Documentation: https://www.odoo.com/odoo/knowledge/18175${ENDCOLOR}"
-	echo "${BLUE}1) Complete Install  2) Check Tools  3) Advanced Install  4) Exit${ENDCOLOR}"
-	read -rp "${GREEN}Select option [1-4]: ${ENDCOLOR}" choice
+	echo -e "${BLUE}1) Complete Install \n2) Check Tools \n3) Advanced Install \n4) update this Install \n5) Exit${ENDCOLOR}"
+	read -rp "${GREEN}Select option [1-5]: ${ENDCOLOR}" choice
 	case "$choice" in
 	1) normal_installation ;;
 	2) check_deps ;;
 	3) advanced_installation ;;
-	4) exit 0 ;;
+	4) update_installation ;;
+	5) exit 0 ;;
 	*)
 		echo "${RED}Invalid option${ENDCOLOR}"
 		menu

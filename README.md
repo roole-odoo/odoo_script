@@ -15,7 +15,7 @@ chmod +x odoo_install.sh
 
 ## TODO
 
-- Script should run on 26.04 and 24.04.
+- ~~Script should run on 26.04 and 24.04.~~ tested on 24.04 and 26.06 -> OK
 - Odoo is working well ? Odoorc, IA, all posgress changes ? Need to check on a produced db if it's running
 
 ## Explained
