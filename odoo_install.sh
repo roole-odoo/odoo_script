@@ -196,6 +196,7 @@ check_deps() {
 fetch_git_repositories() {
 	# clone ony master branch to save disk space and cloning time
 	local home_path="$HOME/src"
+	echo "${BLUE}Check and clone Odoo repositories into ${home_path} (might be long if it's the first install on your laptop, so, take a coffee)... ${ENDCOLOR}"
 	mkdir -p "${home_path}"
 	cd "${home_path}"
 
@@ -224,10 +225,10 @@ fetch_git_repositories() {
 	fi
 
 	echo "${BLUE}  Switching repositories to master and update it ...${ENDCOLOR}"
-	cd "${home_path}/odoo" && git switch master && git pull --rebase
-	cd "${home_path}/enterprise" && git switch master && git pull --rebase
-	cd "${home_path}/design-themes" && git switch master && git pull --rebase
-	cd "${home_path}/industry" && git switch master && git pull --rebase
+	cd "${home_path}/odoo" && git switch master && log "Last odoo commit HASH : $(git rev-parse HEAD)" && git pull --rebase
+	cd "${home_path}/enterprise" && git switch master && log "Last enterprise commit HASH : $(git rev-parse HEAD)" && git pull --rebase
+	cd "${home_path}/design-themes" && git switch master && log "Last design-themes commit HASH : $(git rev-parse HEAD)" && git pull --rebase
+	cd "${home_path}/industry" && git switch master && log "Last odoo industry HASH : $(git rev-parse HEAD)" && git pull --rebase
 	echo "${BLUE}  Installing Odoo debian dependencies (setup/debinstall.sh)${ENDCOLOR}"
 	echo "${BLUE}  It might take a while ...${ENDCOLOR}"
 	run sudo "${home_path}/odoo/setup/debinstall.sh"
@@ -363,6 +364,15 @@ advanced_installation() {
 	echo "${BLUE}To end the DB, press CTRL + c${ENDCOLOR}"
 }
 
+extra_installation() {
+	check_memory
+	check_ubuntu
+	check_python
+	install_deps
+	install_rtlcss      # right-to-left
+	install_mailcatcher # mail
+}
+
 update_installation(){
 	check_memory
 	check_ubuntu
@@ -375,13 +385,17 @@ update_installation(){
 menu() {
 	echo "${BLUE}Odoo Local Database installer${ENDCOLOR}"
 	echo "${BLUE}#############################${ENDCOLOR}"
-	echo "${BLUE}Documentation: https://www.odoo.com/odoo/knowledge/18175${ENDCOLOR}"
-	echo -e "${BLUE}1) Complete Install \n2) Check Tools \n3) Advanced Install \n4) update this Install \n5) Exit${ENDCOLOR}"
+	echo "${BLUE}Documentation: https://www.odoo.com/odoo/knowledge/18175 ${ENDCOLOR}"
+	echo  "${BLUE}1) Complete Install (Normal process, for every one) ${ENDCOLOR}"
+	echo  "${BLUE}2) Check Tools (only check your laptop have all dependencies is installed, if not install them) ${ENDCOLOR}"
+	echo  "${BLUE}3) Extra Install (install rtlcss (right-to-left option for Arabic and Hebrew languages) and mailcatcher) ${ENDCOLOR}"
+	echo  "${BLUE}4) Update this Install (update all Github repository) ${ENDCOLOR}"
+	echo  "${BLUE}5) Exit ${ENDCOLOR}"
 	read -rp "${GREEN}Select option [1-5]: ${ENDCOLOR}" choice
 	case "$choice" in
 	1) normal_installation ;;
 	2) check_deps ;;
-	3) advanced_installation ;;
+	3) extra_installation ;;
 	4) update_installation ;;
 	5) exit 0 ;;
 	*)
