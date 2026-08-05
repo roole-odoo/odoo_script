@@ -267,7 +267,7 @@ fetch_git_repositories() {
 
 postgresql_setup() {
 	echo "${BLUE}Configuring PostgreSQL ...${ENDCOLOR}"
-	run_sudo systemctl enable --now postgresql
+	echo "$USER_PASSWORD" | sudo -S systemctl enable --now postgresql
 	if sudo -u postgres psql -t -c '\du' | cut -f 1 -d \| | grep -qw odoo; then
 		echo "${BLUE} Odoo PostgreSQL User already exists. Skipping.${ENDCOLOR}"
 	else
@@ -286,8 +286,8 @@ install_mailcatcher() {
 	if [[ "$answer" =~ ^[Yy]$ ]]; then
 		have mailcatcher && return 0
 		echo "${BLUE}  Installing MailCatcher ...${ENDCOLOR}"
-		run echo "$USER_PASSWORD" | sudo -S -k apt-get install -y ruby ruby-dev
-		run echo "$USER_PASSWORD" | sudo -S -k gem install mailcatcher
+		run_sudo apt-get install -y ruby ruby-dev
+		run_sudo gem install mailcatcher
 	fi
 }
 
