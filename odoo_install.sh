@@ -8,18 +8,23 @@ UPDATE_MODE=0
 ALIAS_NAME="odoo-localDB"
 MANAGER_SHORTCUT_PATH="/home/odoo/Desktop/odoo_local_databases_manager.desktop"
 ODOO_SHORTCUT_PATH="/home/odoo/Desktop/odoo_launcher.desktop"
+USER_PASSWORD=""
 
 RED=$'\e[31m'
 GREEN=$'\e[32m'
 BLUE=$'\e[34m'
 ENDCOLOR=$'\e[0m'
 
-# Create a LOG file a each run
-sudo -v && sudo touch "$LOG" && sudo chown "$USER" "$LOG"
-: >"$LOG"
+create_log_file() {
+	# Create a LOG file a each run
+	echo "$USER_PASSWORD" | sudo -v -k -S && echo "$USER_PASSWORD" | sudo -S -k touch "$LOG" && echo "$USER_PASSWORD" | sudo -S -k chown "$USER" "$LOG"
+	: >"$LOG"
+}
 
 # Put the outuput of heavy cmd into LOG  (often for apt)
 run() { "$@" >>"$LOG" 2>&1; }
+
+run_sudo() { echo "$USER_PASSWORD" | sudo -S -k "$@" >>"$LOG" 2>&1; }
 
 # catch if the script crash
 trap 'echo; echo "FAILED (line $LINENO). Last lines of $LOG:"; tail -n 15 "$LOG"' ERR
@@ -56,9 +61,13 @@ install_cmd() {
 		echo "${BLUE}  $cmd already installed.${ENDCOLOR}"
 	else
 		echo "${BLUE}  Installing $pkg ...${ENDCOLOR}"
-		run sudo apt-get install -y "$pkg"
+		run_sudo apt-get install -y "$pkg"
 		have "$cmd" || echo "${RED}  WARNING: $cmd install failed${ENDCOLOR}"
 	fi
+}
+
+ask_password() {
+	read -r -s -p "${GREEN}Enter you password: ${ENDCOLOR}" USER_PASSWORD
 }
 
 check_ssh_key() {
@@ -148,15 +157,15 @@ check_cmd() {
 install_wkhtmltopdf() {
 	wkhtmltopdf --version 2>/dev/null | grep -q "with patched qt" && return 0
 	echo "${BLUE}  Installing wkhtmltopdf (patched qt) ...${ENDCOLOR}"
-	run sudo dpkg -r wkhtmltox || true
+	run_sudo dpkg -r wkhtmltox || true
 	run curl -sSL https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6.1-2/wkhtmltox_0.12.6.1-2.jammy_amd64.deb -o /tmp/wkhtml.deb
-	run sudo apt-get -y install --no-install-recommends --fix-missing /tmp/wkhtml.deb
+	run_sudo apt-get -y install --no-install-recommends --fix-missing /tmp/wkhtml.deb
 	rm -f /tmp/wkhtml.deb
 }
 
 install_pgvector() {
 	echo "${BLUE}  Installing pgvector ...${ENDCOLOR}"
-	run sudo apt-get install -y "postgresql-18-pgvector"
+	run_sudo apt-get install -y "postgresql-18-pgvector"
 }
 
 install_rtlcss() {
@@ -164,11 +173,11 @@ install_rtlcss() {
 	if [[ "$answer" =~ ^[Yy]$ ]]; then
 		install_cmd npm
 		echo "${BLUE}  Installing rtlcss ...${ENDCOLOR}"
-		run sudo npm install -g rtlcss
+		run_sudo npm install -g rtlcss
 		read -r -p "${GREEN}Remove NPM ? [y/N]: ${ENDCOLOR}" answer
 		if [[ "$answer" =~ ^[Yy]$ ]]; then
 			echo "${BLUE}  Removing npm ...${ENDCOLOR}"
-			run sudo apt-get -y remove npm
+			run_sudo apt-get -y remove npm
 		fi
 	fi
 }
@@ -252,19 +261,19 @@ fetch_git_repositories() {
 
 	echo "${BLUE}  Installing Odoo debian dependencies (setup/debinstall.sh)${ENDCOLOR}"
 	echo "${BLUE}  It might take a while ...${ENDCOLOR}"
-	run sudo "${src_path}/odoo/setup/debinstall.sh"
+	run_sudo "${src_path}/odoo/setup/debinstall.sh"
 	return 0
 }
 
 postgresql_setup() {
 	echo "${BLUE}Configuring PostgreSQL ...${ENDCOLOR}"
-	run sudo systemctl enable --now postgresql
+	run_sudo systemctl enable --now postgresql
 	if sudo -u postgres psql -t -c '\du' | cut -f 1 -d \| | grep -qw odoo; then
 		echo "${BLUE} Odoo PostgreSQL User already exists. Skipping.${ENDCOLOR}"
 	else
-		run sudo -u postgres createuser -d -R -S odoo
+		run_sudo sudo -u postgres createuser -d -R -S odoo
 	fi
-	run sudo -u postgres psql -d template1 -c "CREATE EXTENSION IF NOT EXISTS vector;" # ALL FUTUR DB will get it
+	run_sudo sudo -u postgres psql -d template1 -c "CREATE EXTENSION IF NOT EXISTS vector;" # ALL FUTUR DB will get it
 }
 
 setup_odoorc() {
@@ -277,8 +286,8 @@ install_mailcatcher() {
 	if [[ "$answer" =~ ^[Yy]$ ]]; then
 		have mailcatcher && return 0
 		echo "${BLUE}  Installing MailCatcher ...${ENDCOLOR}"
-		run sudo apt-get install -y ruby ruby-dev
-		run sudo gem install mailcatcher
+		run echo "$USER_PASSWORD" | sudo -S -k apt-get install -y ruby ruby-dev
+		run echo "$USER_PASSWORD" | sudo -S -k gem install mailcatcher
 	fi
 }
 
@@ -349,14 +358,14 @@ add_desktop_shortcuts() {
 print_end_message() {
 	echo "${BLUE}Installation complete. Full log: $LOG${ENDCOLOR}"
 	echo "${BLUE}To start the new DB enter this command in a new terminal:${ENDCOLOR}"
-	echo "${BLUE}	${ALIAS_NAME} ${ENDCOLOR}"
+	echo "${BLUE}	cd /home/odoo/src/odoo && python3 ./odoo-bin -d ${DB_NAME} ${ENDCOLOR}"
 	echo "${BLUE}This will start your DB, that you will be able to manage on http://localhost:8069/web/database/manager (shortcut added to your desktop) ${ENDCOLOR}"
 	echo "${BLUE}To end the DB, press CTRL + c${ENDCOLOR}"
 }
 
 odoo_local_installation() {
 	clear
-	read -r -p "${GREEN}Do you need advanced installation options ? Support for right-to-left languages (Arabic, Hebrew) and local emails support (mailcatcher). Only needed if you work with those [y/N]: ${ENDCOLOR}" answer
+	read -r -p "${GREEN}Do you need advanced installation options ? Support for right-to-left languages (Arabic, Hebrew) and local emails service (mailcatcher). Only needed if you work with those [y/N]: ${ENDCOLOR}" answer
 	if [[ "$answer" =~ ^[Yy]$ ]]; then
 		ADVANCED_MODE=1
 	fi
@@ -394,11 +403,13 @@ menu() {
 	echo "${BLUE}Odoo Local Database installer${ENDCOLOR}"
 	echo "${BLUE}#############################${ENDCOLOR}"
 	echo "${BLUE}Documentation: https://www.odoo.com/odoo/knowledge/18175 ${ENDCOLOR}"
+	ask_password
+	create_log_file
 	echo "${BLUE}1) Complete Install ${ENDCOLOR}"
 	echo "${BLUE}2) Check Tools (only check your laptop have all dependencies installed, if not install them) ${ENDCOLOR}"
 	echo "${BLUE}3) Update this Install (update all Github repository) ${ENDCOLOR}"
 	echo "${BLUE}4) Exit ${ENDCOLOR}"
-	read -rp "${GREEN}Select option [1-5]: ${ENDCOLOR}" choice
+	read -rp "${GREEN}Select option [1-4]: ${ENDCOLOR}" choice
 	case "$choice" in
 	1) odoo_local_installation ;;
 	2) check_deps ;;
@@ -409,6 +420,7 @@ menu() {
 		menu
 		;;
 	esac
+	unset USER_PASSWORD
 }
 
 menu
