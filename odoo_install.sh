@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
-DEBUG_FILE="$HOME/Desktop/odoo_install.debug"
+DEBUG_FILE="/home/odoo/Desktop/odoo_install.debug"
 LOG="/var/log/odoo_installation.log"
 DB_NAME=""
+ADVANCED_MODE=0
+UPDATE_MODE=0
 ALIAS_NAME="odoo-localDB"
-MANAGER_SHORTCUT_PATH="$HOME/Desktop/odoo_local_databases_manager.desktop"
-ODOO_SHORTCUT_PATH="$HOME/Desktop/odoo_launcher.desktop"
+MANAGER_SHORTCUT_PATH="/home/odoo/Desktop/odoo_local_databases_manager.desktop"
+ODOO_SHORTCUT_PATH="/home/odoo/Desktop/odoo_launcher.desktop"
 
 RED=$'\e[31m'
 GREEN=$'\e[32m'
@@ -49,9 +51,9 @@ install_cmd() {
 
 check_ssh_key() {
 	local user_gram
-	local ssh_known_hosts_path="$HOME/.ssh/known_hosts"
-	local ssh_key_path="$HOME/.ssh/id_ed25519"
-	local ssh_pub_key_path="$HOME/.ssh/id_ed25519.pub"
+	local ssh_known_hosts_path="/home/odoo/.ssh/known_hosts"
+	local ssh_key_path="/home/odoo/.ssh/id_ed25519"
+	local ssh_pub_key_path="/home/odoo/.ssh/id_ed25519.pub"
 	user_gram="$(cut -d '-' -f 1 </etc/hostname)"
 	if [[ -f "${ssh_pub_key_path}" ]]; then
 		echo "${BLUE}There is already an exisiting SSH key on this system(${ssh_key_path}) ${ENDCOLOR}"
@@ -65,11 +67,11 @@ check_ssh_key() {
 		echo "$(<$ssh_pub_key_path)"
 	fi
 	echo "${BLUE}Adding Github fingerprints to known_hosts file if needed${ENDCOLOR}"
-		if [[ -f "${ssh_known_hosts_path}" ]] && grep -qw "github.com" $ssh_known_hosts_path; then
-			echo "${BLUE}Fingerprint already present, nothing to do${ENDCOLOR}"
-		else
-			curl --silent https://api.github.com/meta | jq --raw-output '"github.com "+.ssh_keys[]' >> $ssh_known_hosts_path #https://docs.github.com/en/rest/meta/meta?apiVersion=2026-03-10#get-github-meta-information
-		fi
+	if [[ -f "${ssh_known_hosts_path}" ]] && grep -qw "github.com" $ssh_known_hosts_path; then
+		echo "${BLUE}Fingerprint already present, nothing to do${ENDCOLOR}"
+	else
+		curl --silent https://api.github.com/meta | jq --raw-output '"github.com "+.ssh_keys[]' >>$ssh_known_hosts_path #https://docs.github.com/en/rest/meta/meta?apiVersion=2026-03-10#get-github-meta-information
+	fi
 	while true; do
 		read -r -p "${GREEN}Have you added your public key to your GitHub account ? [y/N]: ${ENDCOLOR}" answer
 		if [[ "$answer" =~ ^[Yy]$ ]]; then
@@ -182,56 +184,62 @@ check_deps() {
 	check_cmd psql
 	check_cmd wkhtmltopdf
 	log "--- 4. Folders ---"
-	exists $HOME/src
-	repo_check $HOME/src/odoo
-	repo_check $HOME/src/enterprise
-	repo_check $HOME/src/design-themes
-	repo_check $HOME/src/industry
+	exists /home/odoo/src
+	repo_check /home/odoo/src/odoo
+	repo_check /home/odoo/src/enterprise
+	repo_check /home/odoo/src/design-themes
+	repo_check /home/odoo/src/industry
 	log "--- 6. Extra dependencies ---"
 	check_cmd rtlcss
 	check_cmd mailcatcher
 	echo "Report saved to $DEBUG_FILE"
 }
 
+clone_repository() {
+	local src_path="/home/odoo/src"
+	local repo_name="$1"
+	cd $src_path
+	if [[ ! -d "$repo_name" ]]; then
+		git clone "git@github.com:odoo/${repo_name}.git"
+	else
+		if [[ "$UPDATE_MODE" != 1 ]]; then
+			read -r -p "${GREEN}'${repo_name}' directory already exists, do you want to overwrite it ? [y/N]: ${ENDCOLOR}" answer
+			if [[ "$answer" =~ ^[Yy]$ ]]; then
+				rm -rf "./${repo_name}"
+				git clone --single-branch master "git@github.com:odoo/${repo_name}.git"
+			else
+				echo "${BLUE} Skipping clone of '${repo_name}'.${ENDCOLOR}"
+			fi
+		fi
+	fi
+}
+
+update_repository() {
+	local src_path="/home/odoo/src"
+	local repo_name="$1"
+	cd "${src_path}/${repo_name}" && git switch master && log "Last '${repo_name}' commit HASH : $(git rev-parse HEAD)" && git pull --rebase
+}
+
 fetch_git_repositories() {
 	# clone ony master branch to save disk space and cloning time
-	local home_path="$HOME/src"
-	echo "${BLUE}Check and clone Odoo repositories into ${home_path} (might be long if it's the first install on your laptop, so, take a coffee)... ${ENDCOLOR}"
-	mkdir -p "${home_path}"
-	cd "${home_path}"
+	local src_path="/home/odoo/src"
+	echo "${BLUE}Check and clone Odoo repositories into ${src_path} (might be long if it's the first install on your laptop, so, take a coffee)... ${ENDCOLOR}"
+	mkdir -p "${src_path}"
 
-	if [[ ! -d "${home_path}/odoo" ]]; then
-		git clone --single-branch --branch master git@github.com:odoo/odoo.git
-	else
-		echo "${BLUE}  ${home_path}/odoo already exists, skipping clone.${ENDCOLOR}"
-	fi
-
-	if [[ ! -d "${home_path}/enterprise" ]]; then
-		git clone --single-branch --branch master git@github.com:odoo/enterprise.git
-	else
-		echo "${BLUE}  ${home_path}/enterprise already exists, skipping clone.${ENDCOLOR}"
-	fi
-
-	if [[ ! -d "${home_path}/design-themes" ]]; then
-		git clone --single-branch --branch master git@github.com:odoo/design-themes.git
-	else
-		echo "${BLUE}  ${home_path}/design-themes already exists, skipping clone.${ENDCOLOR}"
-	fi
-
-	if [[ ! -d "${home_path}/industry" ]]; then
-		git clone --single-branch --branch master git@github.com:odoo/industry.git
-	else
-		echo "${BLUE}  ${home_path}/industry already exists, skipping clone.${ENDCOLOR}"
-	fi
+	clone_repository "odoo"
+	clone_repository "enterprise"
+	clone_repository "design-themes"
+	clone_repository "industry"
 
 	echo "${BLUE}  Switching repositories to master and update it ...${ENDCOLOR}"
-	cd "${home_path}/odoo" && git switch master && log "Last odoo commit HASH : $(git rev-parse HEAD)" && git pull --rebase
-	cd "${home_path}/enterprise" && git switch master && log "Last enterprise commit HASH : $(git rev-parse HEAD)" && git pull --rebase
-	cd "${home_path}/design-themes" && git switch master && log "Last design-themes commit HASH : $(git rev-parse HEAD)" && git pull --rebase
-	cd "${home_path}/industry" && git switch master && log "Last odoo industry HASH : $(git rev-parse HEAD)" && git pull --rebase
+	update_repository "odoo"
+	update_repository "enterprise"
+	update_repository "design-themes"
+	update_repository "industry"
+
 	echo "${BLUE}  Installing Odoo debian dependencies (setup/debinstall.sh)${ENDCOLOR}"
 	echo "${BLUE}  It might take a while ...${ENDCOLOR}"
-	run sudo "${home_path}/odoo/setup/debinstall.sh"
+	run sudo "${src_path}/odoo/setup/debinstall.sh"
 	return 0
 }
 
@@ -248,7 +256,7 @@ postgresql_setup() {
 
 setup_odoorc() {
 	echo "${GREEN}Fetching .odoorc configuration ...${ENDCOLOR}"
-	run curl -fsSL -o $HOME/.odoorc https://gist.githubusercontent.com/Abridbus/a4c1ada1e8c61c04ab68cc8ddbb827b1/raw/4614022d0c21bbc02f35254d59c5cefcdbedb12d/.odoorc
+	run curl -fsSL -o /home/odoo/.odoorc https://gist.githubusercontent.com/Abridbus/a4c1ada1e8c61c04ab68cc8ddbb827b1/raw/4614022d0c21bbc02f35254d59c5cefcdbedb12d/.odoorc
 }
 
 install_mailcatcher() {
@@ -270,7 +278,7 @@ create_database() {
 		echo "${RED}Invalid name: only a-z, A-Z, 0-9, _ and - allowed.${ENDCOLOR}"
 	done
 	if [[ -n "$DB_NAME" ]]; then
-		cd $HOME/src/odoo
+		cd /home/odoo/src/odoo
 		echo "${BLUE}Creating database '$DB_NAME' (a few minutes) ...${ENDCOLOR}"
 		run python3 odoo-bin -d "$DB_NAME" -i base --stop-after-init
 	fi
@@ -286,55 +294,44 @@ set_expiration_date() {
 	echo "${BLUE}Expiration date set on '$DB_NAME'.${ENDCOLOR}"
 }
 
-check_memory(){
+check_memory() {
 	# check laptop memory, if <= 16G change some github params to prevent clone error "fatal: fetch-pack: Invalid index-pack output"
-	if [ $(awk '/MemTotal/ {print $2}' /proc/meminfo) -le 16777216 ]; then
+	if [ "$(awk '/MemTotal/ {print $2}' /proc/meminfo)" -le 16777216 ]; then
 		git config --global pack.threads 1
 		git config --global http.postBuffer 524288000
 	fi
 }
 
-add_alias(){ # TODO find a way to add this alias in the terminal used by the user
-	if grep -qw $ALIAS_NAME $HOME/.bashrc; then
- 		echo "${BLUE}Alias already exists. Skipping.${ENDCOLOR}"
+add_alias() { # TODO find a way to add this alias in the terminal used by the user
+	if grep -qw $ALIAS_NAME /home/odoo/.bashrc; then
+		echo "${BLUE}Alias already exists. Skipping.${ENDCOLOR}"
 	else
 		echo "${BLUE}Adding a bash alias${ENDCOLOR}"
-		echo "alias $ALIAS_NAME='cd $HOME/src/odoo; ./odoo-bin -d ${DB_NAME}'" >> $HOME/.bashrc
+		echo "alias $ALIAS_NAME='cd /home/odoo/src/odoo; ./odoo-bin -d ${DB_NAME}'" >>/home/odoo/.bashrc
 	fi
 }
 
-add_desktop_shortcuts(){
+add_desktop_shortcuts() {
 	echo "${BLUE}Adding desktop shortcuts${ENDCOLOR}"
+	{
+		echo "[Desktop Entry]"
+		echo "Icon=text-html"
+		echo "Name=Odoo - Local DB manager"
+		echo "Type=Application"
+		echo "Exec= xdg-open http://localhost:8069/web/database/manager"
+	} >"${MANAGER_SHORTCUT_PATH}"
 
-	echo "[Desktop Entry]" > "${MANAGER_SHORTCUT_PATH}" #Not appending so that we can re-run the script and rewrite the shortcut everytime
-	echo "Icon=text-html" >> "${MANAGER_SHORTCUT_PATH}"
-	echo "Name=Odoo - Local DB manager" >> "${MANAGER_SHORTCUT_PATH}"
-	echo "Type=Application" >> "${MANAGER_SHORTCUT_PATH}"
-	echo "Exec= xdg-open http://localhost:8069/web/database/manager" >> "${MANAGER_SHORTCUT_PATH}"
-
-	echo "[Desktop Entry]" > "${ODOO_SHORTCUT_PATH}"
-	echo "Exec=$HOME/src/odoo/odoo-bin" >> "${ODOO_SHORTCUT_PATH}"
-	echo "GenericName=Launch Odoo Local DB" >> "${ODOO_SHORTCUT_PATH}"
-	echo "Icon=system-run" >> "${ODOO_SHORTCUT_PATH}"
-	echo "Name=Launch Odoo Local DB" >> "${ODOO_SHORTCUT_PATH}"
-	echo "StartupNotify=true" >> "${ODOO_SHORTCUT_PATH}"
-	echo "Terminal=true" >> "${ODOO_SHORTCUT_PATH}"
-	echo "Type=Application" >> "${ODOO_SHORTCUT_PATH}"
+	echo "[Desktop Entry]" >"${ODOO_SHORTCUT_PATH}"
+	echo "Exec=/home/odoo/src/odoo/odoo-bin" >>"${ODOO_SHORTCUT_PATH}"
+	echo "GenericName=Launch Odoo Local DB" >>"${ODOO_SHORTCUT_PATH}"
+	echo "Icon=system-run" >>"${ODOO_SHORTCUT_PATH}"
+	echo "Name=Launch Odoo Local DB" >>"${ODOO_SHORTCUT_PATH}"
+	echo "StartupNotify=true" >>"${ODOO_SHORTCUT_PATH}"
+	echo "Terminal=true" >>"${ODOO_SHORTCUT_PATH}"
+	echo "Type=Application" >>"${ODOO_SHORTCUT_PATH}"
 }
 
-normal_installation() {
-	check_memory
-	check_ubuntu
-	check_python
-	install_deps
-	check_ssh_key
-	fetch_git_repositories
-	postgresql_setup
-	setup_odoorc
-	create_database
-	set_expiration_date
-	add_alias
-	add_desktop_shortcuts
+print_end_message() {
 	echo "${BLUE}Installation complete. Full log: $LOG${ENDCOLOR}"
 	echo "${BLUE}To start the new DB enter this command in a new terminal:${ENDCOLOR}"
 	echo "${BLUE}	${ALIAS_NAME} ${ENDCOLOR}"
@@ -342,13 +339,19 @@ normal_installation() {
 	echo "${BLUE}To end the DB, press CTRL + c${ENDCOLOR}"
 }
 
-advanced_installation() {
+odoo_local_installation() {
+	read -r -p "${GREEN}Do you need advanced installation options ? Support for right-to-left languages (Arabic, Hebrew) and local emails support (mailcatcher). Only needed if you work with those [y/N]: ${ENDCOLOR}" answer
+	if [[ "$answer" =~ ^[Yy]$ ]]; then
+		ADVANCED_MODE=1
+	fi
 	check_memory
 	check_ubuntu
 	check_python
 	install_deps
-	install_rtlcss      # right-to-left
-	install_mailcatcher # mail
+	if [[ "$ADVANCED_MODE" == 1 ]]; then
+		install_rtlcss      # right-to-left
+		install_mailcatcher # mail
+	fi
 	check_ssh_key
 	fetch_git_repositories
 	postgresql_setup
@@ -364,16 +367,8 @@ advanced_installation() {
 	echo "${BLUE}To end the DB, press CTRL + c${ENDCOLOR}"
 }
 
-extra_installation() {
-	check_memory
-	check_ubuntu
-	check_python
-	install_deps
-	install_rtlcss      # right-to-left
-	install_mailcatcher # mail
-}
-
-update_installation(){
+update_installation() {
+	UPDATE_MODE=1 #Do not annoy user for overwrite questions
 	check_memory
 	check_ubuntu
 	check_python
@@ -386,18 +381,16 @@ menu() {
 	echo "${BLUE}Odoo Local Database installer${ENDCOLOR}"
 	echo "${BLUE}#############################${ENDCOLOR}"
 	echo "${BLUE}Documentation: https://www.odoo.com/odoo/knowledge/18175 ${ENDCOLOR}"
-	echo  "${BLUE}1) Complete Install (Normal process, for every one) ${ENDCOLOR}"
-	echo  "${BLUE}2) Check Tools (only check your laptop have all dependencies is installed, if not install them) ${ENDCOLOR}"
-	echo  "${BLUE}3) Extra Install (install rtlcss (right-to-left option for Arabic and Hebrew languages) and mailcatcher) ${ENDCOLOR}"
-	echo  "${BLUE}4) Update this Install (update all Github repository) ${ENDCOLOR}"
-	echo  "${BLUE}5) Exit ${ENDCOLOR}"
+	echo "${BLUE}1) Complete Install ${ENDCOLOR}"
+	echo "${BLUE}2) Check Tools (only check your laptop have all dependencies installed, if not install them) ${ENDCOLOR}"
+	echo "${BLUE}3) Update this Install (update all Github repository) ${ENDCOLOR}"
+	echo "${BLUE}4) Exit ${ENDCOLOR}"
 	read -rp "${GREEN}Select option [1-5]: ${ENDCOLOR}" choice
 	case "$choice" in
-	1) normal_installation ;;
+	1) odoo_local_installation ;;
 	2) check_deps ;;
-	3) extra_installation ;;
-	4) update_installation ;;
-	5) exit 0 ;;
+	3) update_installation ;;
+	4) exit 0 ;;
 	*)
 		echo "${RED}Invalid option${ENDCOLOR}"
 		menu
