@@ -373,11 +373,11 @@ odoo_local_installation() {
 	check_ubuntu
 	check_python
 	install_deps
+	check_ssh_key
 	if [[ "$ADVANCED_MODE" == 1 ]]; then
 		install_rtlcss      # right-to-left
 		install_mailcatcher # mail
 	fi
-	check_ssh_key
 	fetch_git_repositories
 	postgresql_setup
 	create_database
