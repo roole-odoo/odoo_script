@@ -31,10 +31,22 @@ ok() { log "${GREEN}[  OK  ] $*${ENDCOLOR}"; }
 
 fail() { log "${RED}[ MISS ] $*${ENDCOLOR}"; }
 
-exists() { [[ -e "$1" ]] && ok "$1" || fail "$1"; }
+exists() {
+	if [[ -e "$1" ]]; then
+		ok "$1"
+	else
+		fail "$1"
+	fi
+}
 
 # Check the repo and print the branch
-repo_check() { [[ -d "$1/.git" ]] && ok "$1 ($(git -C "$1" rev-parse --abbrev-ref HEAD))" || fail "$1"; }
+repo_check() {
+	if [[ -d "$1/.git" ]]; then
+		ok "$1 ($(git -C "$1" rev-parse --abbrev-ref HEAD))"
+	else
+		fail "$1"
+	fi
+}
 
 have() { command -v "$1" >/dev/null 2>&1; } # Check a cmd
 
@@ -172,6 +184,7 @@ install_deps() {
 }
 
 check_deps() {
+	clear
 	log "--- 1. System ---"
 	. /etc/os-release
 	log "OS       : $ID $VERSION_ID"
@@ -200,13 +213,13 @@ clone_repository() {
 	local repo_name="$1"
 	cd $src_path
 	if [[ ! -d "$repo_name" ]]; then
-		git clone "git@github.com:odoo/${repo_name}.git"
+		run git clone "git@github.com:odoo/${repo_name}.git"
 	else
 		if [[ "$UPDATE_MODE" != 1 ]]; then
 			read -r -p "${GREEN}'${repo_name}' directory already exists, do you want to overwrite it ? [y/N]: ${ENDCOLOR}" answer
 			if [[ "$answer" =~ ^[Yy]$ ]]; then
-				rm -rf "./${repo_name}"
-				git clone --single-branch master "git@github.com:odoo/${repo_name}.git"
+				run rm -rf "./${repo_name}"
+				run git clone --single-branch master "git@github.com:odoo/${repo_name}.git"
 			else
 				echo "${BLUE} Skipping clone of '${repo_name}'.${ENDCOLOR}"
 			fi
@@ -217,15 +230,15 @@ clone_repository() {
 update_repository() {
 	local src_path="/home/odoo/src"
 	local repo_name="$1"
-	cd "${src_path}/${repo_name}" && git switch master && log "Last '${repo_name}' commit HASH : $(git rev-parse HEAD)" && git pull --rebase
+	cd "${src_path}/${repo_name}" && git switch master && log "Last '${repo_name}' commit HASH : $(git rev-parse HEAD)" && run git pull --rebase
 }
 
 fetch_git_repositories() {
 	# clone ony master branch to save disk space and cloning time
 	local src_path="/home/odoo/src"
-	echo "${BLUE}Check and clone Odoo repositories into ${src_path} (might be long if it's the first install on your laptop, so, take a coffee)... ${ENDCOLOR}"
 	mkdir -p "${src_path}"
 
+	echo "${BLUE}  Check and clone Odoo repositories into ${src_path} (might be long if it's the first install on your laptop, so, take a coffee)... ${ENDCOLOR}"
 	clone_repository "odoo"
 	clone_repository "enterprise"
 	clone_repository "design-themes"
@@ -245,13 +258,13 @@ fetch_git_repositories() {
 
 postgresql_setup() {
 	echo "${BLUE}Configuring PostgreSQL ...${ENDCOLOR}"
-	sudo systemctl enable --now postgresql
+	run sudo systemctl enable --now postgresql
 	if sudo -u postgres psql -t -c '\du' | cut -f 1 -d \| | grep -qw odoo; then
 		echo "${BLUE} Odoo PostgreSQL User already exists. Skipping.${ENDCOLOR}"
 	else
-		sudo -u postgres createuser -d -R -S odoo
+		run sudo -u postgres createuser -d -R -S odoo
 	fi
-	sudo -u postgres psql -d template1 -c "CREATE EXTENSION IF NOT EXISTS vector;" # ALL FUTUR DB will get it
+	run sudo -u postgres psql -d template1 -c "CREATE EXTENSION IF NOT EXISTS vector;" # ALL FUTUR DB will get it
 }
 
 setup_odoorc() {
@@ -297,8 +310,8 @@ set_expiration_date() {
 check_memory() {
 	# check laptop memory, if <= 16G change some github params to prevent clone error "fatal: fetch-pack: Invalid index-pack output"
 	if [ "$(awk '/MemTotal/ {print $2}' /proc/meminfo)" -le 16777216 ]; then
-		git config --global pack.threads 1
-		git config --global http.postBuffer 524288000
+		run git config --global pack.threads 1
+		run git config --global http.postBuffer 524288000
 	fi
 }
 
@@ -321,14 +334,16 @@ add_desktop_shortcuts() {
 		echo "Exec= xdg-open http://localhost:8069/web/database/manager"
 	} >"${MANAGER_SHORTCUT_PATH}"
 
-	echo "[Desktop Entry]" >"${ODOO_SHORTCUT_PATH}"
-	echo "Exec=/home/odoo/src/odoo/odoo-bin" >>"${ODOO_SHORTCUT_PATH}"
-	echo "GenericName=Launch Odoo Local DB" >>"${ODOO_SHORTCUT_PATH}"
-	echo "Icon=system-run" >>"${ODOO_SHORTCUT_PATH}"
-	echo "Name=Launch Odoo Local DB" >>"${ODOO_SHORTCUT_PATH}"
-	echo "StartupNotify=true" >>"${ODOO_SHORTCUT_PATH}"
-	echo "Terminal=true" >>"${ODOO_SHORTCUT_PATH}"
-	echo "Type=Application" >>"${ODOO_SHORTCUT_PATH}"
+	{
+		echo "[Desktop Entry]"
+		echo "Exec=/home/odoo/src/odoo/odoo-bin"
+		echo "GenericName=Launch Odoo Local DB"
+		echo "Icon=system-run"
+		echo "Name=Launch Odoo Local DB"
+		echo "StartupNotify=true"
+		echo "Terminal=true"
+		echo "Type=Application"
+	} >"$ODOO_SHORTCUT_PATH"
 }
 
 print_end_message() {
@@ -340,6 +355,7 @@ print_end_message() {
 }
 
 odoo_local_installation() {
+	clear
 	read -r -p "${GREEN}Do you need advanced installation options ? Support for right-to-left languages (Arabic, Hebrew) and local emails support (mailcatcher). Only needed if you work with those [y/N]: ${ENDCOLOR}" answer
 	if [[ "$answer" =~ ^[Yy]$ ]]; then
 		ADVANCED_MODE=1
@@ -360,15 +376,12 @@ odoo_local_installation() {
 	set_expiration_date
 	add_alias
 	add_desktop_shortcuts
-	echo "${BLUE}Installation complete. Full log: $LOG${ENDCOLOR}"
-	echo "${BLUE}To start the new DB enter this command in a new terminal:${ENDCOLOR}"
-	echo "${BLUE}	${ALIAS_NAME} ${ENDCOLOR}"
-	echo "${BLUE}This will start your DB, that you will be able to manage on http://localhost:8069/web/database/manager (shortcut added to your desktop)${ENDCOLOR}"
-	echo "${BLUE}To end the DB, press CTRL + c${ENDCOLOR}"
+	print_end_message
 }
 
 update_installation() {
 	UPDATE_MODE=1 #Do not annoy user for overwrite questions
+	clear
 	check_memory
 	check_ubuntu
 	check_python
