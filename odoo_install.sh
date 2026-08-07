@@ -22,6 +22,12 @@ create_log_file() {
     sudo chown "$USER" "$LOG"
     : >"$LOG"
     sudo -k
+	# Create a LOG file a each run
+	echo "$USER_PASSWORD" | sudo -v -S >/dev/null 2>&1
+	sudo touch "$LOG"
+	sudo chown "$USER" "$LOG"
+	: >"$LOG"
+	sudo -k
 }
 
 # Put the outuput of heavy cmd into LOG  (often for apt)
