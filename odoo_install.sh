@@ -243,7 +243,7 @@ check_deps() {
 clone_repository() {
 	local src_path="/home/odoo/src"
 	local repo_name="$1"
-	log "${BLUE}  Check and clone Odoo repositories into ${src_path}/${repo_name}\n  Might be long if it's the first install on your laptop, so, take a coffee... ${ENDCOLOR}"
+	log "${BLUE}  Check and clone Odoo ${repo_name} repositorie into ${src_path}\ \n  Might be long if it's the first install on your laptop, so, take a coffee... ${ENDCOLOR}"
 	cd $src_path
 	if [[ ! -d "$repo_name" ]]; then
 		run git clone "git@github.com:odoo/${repo_name}.git"
