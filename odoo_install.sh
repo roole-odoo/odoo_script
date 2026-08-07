@@ -338,7 +338,7 @@ add_alias() { # TODO find a way to add this alias in the terminal used by the us
 		log "${BLUE}Alias already exists. Skipping.${ENDCOLOR}"
 	else
 		log "${BLUE}Adding a bash alias${ENDCOLOR}"
-		echo "alias $ALIAS_NAME='cd /home/odoo/src/odoo; python3 ./odoo-bin -d ${DB_NAME}'" >>/home/odoo/.bashrc
+		echo "alias $ALIAS_NAME='cd /home/odoo/src/odoo; python3 ./odoo-bin'" >>/home/odoo/.bashrc
 	fi
 }
 
@@ -368,7 +368,7 @@ print_end_message() {
 	log "${BLUE}Installation complete.${ENDCOLOR}"
 	echo "${BLUE}Full log: $LOG${ENDCOLOR}"
 	echo "${BLUE}To start the new DB enter this command in a new terminal:${ENDCOLOR}"
-	echo "${BLUE}	cd /home/odoo/src/odoo && python3 ./odoo-bin -d ${DB_NAME} ${ENDCOLOR}"
+	echo "${BLUE}	cd /home/odoo/src/odoo && python3 ./odoo-bin ${ENDCOLOR}"
 	echo "${BLUE}This will start your DB, that you will be able to manage on http://localhost:8069/web/database/manager (shortcut added to your desktop) ${ENDCOLOR}"
 	echo "${BLUE}To end the DB, press CTRL + c${ENDCOLOR}"
 }
