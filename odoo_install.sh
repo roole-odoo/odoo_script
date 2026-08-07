@@ -16,9 +16,12 @@ BLUE=$'\e[34m'
 ENDCOLOR=$'\e[0m'
 
 create_log_file() {
-	# Create a LOG file a each run
-	echo "$USER_PASSWORD" | sudo -v -k -S && echo "$USER_PASSWORD" | sudo -S -k touch "$LOG" && echo "$USER_PASSWORD" | sudo -S -k chown "$USER" "$LOG"
-	: >"$LOG"
+    # Create a LOG file a each run
+    echo "$USER_PASSWORD" | sudo -v -S >/dev/null 2>&1
+    sudo touch "$LOG"
+    sudo chown "$USER" "$LOG"
+    : >"$LOG"
+    sudo -k
 }
 
 # Put the outuput of heavy cmd into LOG  (often for apt)
@@ -31,7 +34,7 @@ trap 'echo; echo "FAILED (line $LINENO). Last lines of $LOG:"; tail -n 15 "$LOG"
 
 # Echo + in debug file
 log() {
-	echo "$*"
+	echo -e "$*"
 	echo "$(date) - $*" >>"$DEBUG_FILE"
 }
 
@@ -45,6 +48,13 @@ exists() {
 	else
 		fail "$1"
 	fi
+}
+
+inputdata(){
+	#clean stdin  buffer
+	while read -r -t 0; do read -r; done
+	read -r -p "$*" response
+	echo "${response}"
 }
 
 # Check the repo and print the branch
@@ -70,7 +80,11 @@ install_cmd() {
 }
 
 ask_password() {
-	read -r -s -p "${GREEN}Enter you password (output is silent): ${ENDCOLOR}" USER_PASSWORD
+    while read -r -t 0; do read -r; done
+    while ! (echo "$USER_PASSWORD" | sudo -S -k -v >/dev/null 2>&1); do
+        read -r -s -p "${GREEN}Enter you password (output is silent): ${ENDCOLOR}" USER_PASSWORD
+        echo ""
+    done
 }
 
 check_ssh_key() {
@@ -97,7 +111,7 @@ check_ssh_key() {
 		curl --silent https://api.github.com/meta | jq --raw-output '"github.com "+.ssh_keys[]' >>$ssh_known_hosts_path #https://docs.github.com/en/rest/meta/meta?apiVersion=2026-03-10#get-github-meta-information
 	fi
 	while true; do
-		read -r -p "${GREEN}Have you added your public key to your GitHub account ? [y/N]: ${ENDCOLOR}" answer
+		answer=$(inputdata "${GREEN}Have you added your public key to your GitHub account ? [y/N]: ${ENDCOLOR}")
 		if [[ "$answer" =~ ^[Yy]$ ]]; then
 			log "${BLUE}Starting the installation in 5s ...${ENDCOLOR}"
 			sleep 5
@@ -172,12 +186,12 @@ install_pgvector() {
 }
 
 install_rtlcss() {
-	read -r -p "${GREEN}Need RTLCSS ? It's for the Odoo interface for right-to-left languages (Arabic, Hebrew). Only needed if you work with those [y/N]: ${ENDCOLOR}" answer
+	answer=$(inputdata "${GREEN}Need RTLCSS ? It's for the Odoo interface for right-to-left languages (Arabic, Hebrew). Only needed if you work with those [y/N]: ${ENDCOLOR}")
 	if [[ "$answer" =~ ^[Yy]$ ]]; then
 		install_cmd npm
 		log "${BLUE}  Installing rtlcss ...${ENDCOLOR}"
 		run_sudo npm install -g rtlcss
-		read -r -p "${GREEN}Remove NPM ? [y/N]: ${ENDCOLOR}" answer
+		answer=$(inputdata "${GREEN}Remove NPM ? [y/N]: ${ENDCOLOR}")
 		if [[ "$answer" =~ ^[Yy]$ ]]; then
 			log "${BLUE}  Removing npm ...${ENDCOLOR}"
 			run_sudo apt-get -y remove npm
@@ -223,13 +237,13 @@ check_deps() {
 clone_repository() {
 	local src_path="/home/odoo/src"
 	local repo_name="$1"
-	log "${BLUE}  Check and clone Odoo repositories into ${src_path} (might be long if it's the first install on your laptop, so, take a coffee)... ${ENDCOLOR}"
+	log "${BLUE}  Check and clone Odoo repositories into ${src_path}/${repo_name}\n  Might be long if it's the first install on your laptop, so, take a coffee... ${ENDCOLOR}"
 	cd $src_path
 	if [[ ! -d "$repo_name" ]]; then
 		run git clone "git@github.com:odoo/${repo_name}.git"
 	else
 		if [[ "$UPDATE_MODE" != 1 ]]; then
-			read -r -p "${GREEN}'${repo_name}' directory already exists, do you want to overwrite it ? [y/N]: ${ENDCOLOR}" answer
+			answer=$(inputdata "${GREEN}'${repo_name}' directory already exists, do you want to overwrite it ? [y/N]: ${ENDCOLOR}")
 			if [[ "$answer" =~ ^[Yy]$ ]]; then
 				run rm -rf "./${repo_name}"
 				run git clone "git@github.com:odoo/${repo_name}.git"
@@ -243,7 +257,7 @@ clone_repository() {
 update_repository() {
 	local src_path="/home/odoo/src"
 	local repo_name="$1"
-	log "${BLUE}  Switching repositories to master and update it ...${ENDCOLOR}"
+	log "${BLUE}  Switching repositories ${repo_name} to master and update it ...${ENDCOLOR}"
 	cd "${src_path}/${repo_name}"
 	git switch master
 	log "Last '${repo_name}' commit HASH : $(git rev-parse HEAD)"
@@ -288,7 +302,7 @@ setup_odoorc() {
 }
 
 install_mailcatcher() {
-	read -r -p "${GREEN}Need MailCatcher ? It's for having on local a mailing solution. [y/N]: ${ENDCOLOR}" answer
+	answer=inputdata "${GREEN}Need MailCatcher ? It's for having on local a mailing solution. [y/N]: ${ENDCOLOR}"
 	if [[ "$answer" =~ ^[Yy]$ ]]; then
 		have mailcatcher && return 0
 		log "${BLUE}  Installing MailCatcher ...${ENDCOLOR}"
@@ -300,7 +314,7 @@ install_mailcatcher() {
 create_database() {
 	local pattern="^[0-9a-zA-Z_-]{1,60}$"
 	while :; do
-		read -r -p "${GREEN}Name of your database you want to create (leave empty to create default one named odoo): ${ENDCOLOR}" DB_NAME
+		answer=$(inputdata "${GREEN}Name of your database you want to create (leave empty to create default one named odoo): ${ENDCOLOR}")
 		[[ -z "$DB_NAME" ]] && DB_NAME="odoo"
 		[[ $DB_NAME =~ $pattern ]] && break
 		echo "${RED}Invalid name: only a-z, A-Z, 0-9, _ and - allowed.${ENDCOLOR}"
@@ -375,7 +389,7 @@ print_end_message() {
 
 odoo_local_installation() {
 	clear
-	read -r -p "${GREEN}Do you need advanced installation options ? Support for right-to-left languages (Arabic, Hebrew) and local emails service (mailcatcher). Only needed if you work with those [y/N]: ${ENDCOLOR}" answer
+	answer=$(inputdata "${GREEN}Do you need advanced installation options ? Support for right-to-left languages (Arabic, Hebrew) and local emails service (mailcatcher). Only needed if you work with those [y/N]: ${ENDCOLOR}")
 	if [[ "$answer" =~ ^[Yy]$ ]]; then
 		ADVANCED_MODE=1
 	fi
@@ -417,7 +431,7 @@ menu() {
 	echo "${BLUE}2) Check Tools (only check your laptop have all dependencies installed, if not install them) ${ENDCOLOR}"
 	echo "${BLUE}3) Update this Install (update all Github repository) ${ENDCOLOR}"
 	echo "${BLUE}4) Exit ${ENDCOLOR}"
-	read -rp "${GREEN}Select option [1-4]: ${ENDCOLOR}" choice
+	choice=$(inputdata "${GREEN}Select option [1-4]: ${ENDCOLOR}")
 	case "$choice" in
 	1)
 		ask_password
