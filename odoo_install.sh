@@ -17,8 +17,11 @@ ENDCOLOR=$'\e[0m'
 
 create_log_file() {
 	# Create a LOG file a each run
-	echo "$USER_PASSWORD" | sudo -v -k -S && echo "$USER_PASSWORD" | sudo -S -k touch "$LOG" && echo "$USER_PASSWORD" | sudo -S -k chown "$USER" "$LOG"
+	echo "$USER_PASSWORD" | sudo -v -S >/dev/null 2>&1
+	sudo touch "$LOG"
+	sudo chown "$USER" "$LOG"
 	: >"$LOG"
+	sudo -k
 }
 
 # Put the outuput of heavy cmd into LOG  (often for apt)
@@ -70,7 +73,10 @@ install_cmd() {
 }
 
 ask_password() {
-	read -r -s -p "${GREEN}Enter you password (output is silent): ${ENDCOLOR}" USER_PASSWORD
+	while ! (echo "$USER_PASSWORD" | sudo -S -k -v >/dev/null 2>&1); do
+		read -r -s -p "${GREEN}Enter you password (output is silent): ${ENDCOLOR}" USER_PASSWORD
+		echo ""
+	done
 }
 
 check_ssh_key() {
