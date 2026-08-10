@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-## v1.0
+## v20.0
 ## 20260810
 ## Odoo OXP 2026 - Master=20
 
@@ -449,7 +449,7 @@ update_installation() {
 menu() {
 	echo "${BLUE}Odoo Local Database installer${ENDCOLOR}"
 	echo "${BLUE}#############################${ENDCOLOR}"
-	echo "${BLUE}Script version 1.0 - Odoo 20 - OXP 2026${ENDCOLOR}"
+	echo "${BLUE}Script v20.0 following Odoo 20 - OXP 2026${ENDCOLOR}"
 	echo "${BLUE}Documentation: ${knowledge_article} ${ENDCOLOR}"
 	echo "${BLUE}1) Complete install ${ENDCOLOR}"
 	echo "${BLUE}2) Check tools (only check your laptop have all dependencies installed, if not install them) ${ENDCOLOR}"
