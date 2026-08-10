@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+
+## v1.0 
+## 20260810 
+## Odoo OXP 2026 - Master=20
+
 set -Eeuo pipefail
 DEBUG_FILE="/home/odoo/Desktop/odoo_install.debug"
 LOG="/var/log/odoo_installation.log"
