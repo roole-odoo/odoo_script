@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-## v1.0 
-## 20260810 
+## v1.0
+## 20260810
 ## Odoo OXP 2026 - Master=20
 
 set -Eeuo pipefail
@@ -25,12 +25,12 @@ BLUE=$'\e[34m'
 ENDCOLOR=$'\e[0m'
 
 create_log_file() {
-    # Create a LOG file a each run
-    echo "$USER_PASSWORD" | sudo -v -S >/dev/null 2>&1
-    sudo touch "$LOG"
-    sudo chown "$USER" "$LOG"
-    : >"$LOG"
-    sudo -k
+	# Create a LOG file a each run
+	echo "$USER_PASSWORD" | sudo -v -S >/dev/null 2>&1
+	sudo touch "$LOG"
+	sudo chown "$USER" "$LOG"
+	: >"$LOG"
+	sudo -k
 }
 
 # Put the outuput of heavy cmd into LOG  (often for apt)
@@ -59,7 +59,7 @@ exists() {
 	fi
 }
 
-inputdata(){
+inputdata() {
 	#clean stdin  buffer
 	while read -r -t 0; do read -r; done
 	read -r -p "$*" response
@@ -89,11 +89,11 @@ install_cmd() {
 }
 
 ask_password() {
-    while read -r -t 0; do read -r; done
-    while ! (echo "$USER_PASSWORD" | sudo -S -k -v >/dev/null 2>&1); do
-        read -r -s -p "${GREEN}Enter you password (output is silent): ${ENDCOLOR}" USER_PASSWORD
-        echo ""
-    done
+	while read -r -t 0; do read -r; done
+	while ! (echo "$USER_PASSWORD" | sudo -S -k -v >/dev/null 2>&1); do
+		read -r -s -p "${GREEN}Enter you password (output is silent): ${ENDCOLOR}" USER_PASSWORD
+		echo ""
+	done
 }
 
 check_ssh_key() {
@@ -338,10 +338,10 @@ create_database() {
 }
 
 clean_database() {
-	echo "${RED} This db that will be DELETED: "$DB_NAME" ${ENDCOLOR}"
-	sudo -u postgres psql -Atc "SELECT datname FROM pg_database where name ilike "$DB_NAME";"
+	echo "${RED} This db that will be DELETED: '$DB_NAME' ${ENDCOLOR}"
+	sudo -u postgres psql -Atc "SELECT datname FROM pg_database where name ilike '$DB_NAME';"
 	sudo -u postgres dropdb "$DB_NAME"
-	sudo rm -rf ~/.local/share/Odoo/filestore/"$DB_NAME"
+	sudo rm -rf "~/.local/share/Odoo/filestore/${DB_NAME}"
 }
 
 set_expiration_date() {
@@ -435,9 +435,6 @@ update_installation() {
 	clear
 	answer=$(inputdata "${RED}This will highly probably BREAK YOUR EXISTING DATABASES. Are you sure you want to continue [y/N]: ${ENDCOLOR}")
 	if [[ "$answer" =~ ^[Yy]$ ]]; then
-	# if [[ "$answer" =~ ^[Yy]$ ]]; then
-	# 	clean_database
-	# fi
 		check_memory
 		check_ubuntu
 		check_python
