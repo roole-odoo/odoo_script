@@ -15,6 +15,10 @@ MANAGER_SHORTCUT_PATH="/home/odoo/Desktop/odoo_local_databases_manager.desktop"
 ODOO_SHORTCUT_PATH="/home/odoo/Desktop/odoo_launcher.desktop"
 USER_PASSWORD=""
 
+odoorc_gist_path="https://gist.githubusercontent.com/Abridbus/a4c1ada1e8c61c04ab68cc8ddbb827b1/raw/4614022d0c21bbc02f35254d59c5cefcdbedb12d/.odoorc"
+knowledge_article="https://www.odoo.com/odoo/knowledge/72239"
+script_gist_path="https://gist.github.com/Abridbus/03d827605d12ba999998b4cc9f778085"
+
 RED=$'\e[31m'
 GREEN=$'\e[32m'
 BLUE=$'\e[34m'
@@ -267,6 +271,7 @@ update_repository() {
 	git switch master
 	log "Last '${repo_name}' commit HASH : $(git rev-parse HEAD)"
 	run git pull --rebase
+	log "New '${repo_name}' commit HASH : $(git rev-parse HEAD)"
 }
 
 fetch_git_repositories() {
@@ -286,6 +291,7 @@ fetch_git_repositories() {
 
 	log "${BLUE}  Installing Odoo debian dependencies (setup/debinstall.sh)${ENDCOLOR}"
 	echo "${BLUE}  It might take a while ...${ENDCOLOR}"
+	echo "${BLUE}  This will require to create a new database ${ENDCOLOR}"
 	run_sudo "${src_path}/odoo/setup/debinstall.sh"
 	return 0
 }
@@ -303,7 +309,7 @@ postgresql_setup() {
 
 setup_odoorc() {
 	log "${GREEN}Fetching .odoorc configuration ...${ENDCOLOR}"
-	run curl -fsSL -o /home/odoo/.odoorc https://gist.githubusercontent.com/Abridbus/a4c1ada1e8c61c04ab68cc8ddbb827b1/raw/4614022d0c21bbc02f35254d59c5cefcdbedb12d/.odoorc
+	run curl -fsSL -o /home/odoo/.odoorc "${odoorc_gist_path}"
 }
 
 install_mailcatcher() {
@@ -327,8 +333,15 @@ create_database() {
 	if [[ -n "$DB_NAME" ]]; then
 		cd /home/odoo/src/odoo
 		log "${BLUE}Creating database '$DB_NAME' (a few minutes) ...${ENDCOLOR}"
-		run python3 odoo-bin -d "$DB_NAME" -i base --stop-after-init
+		run python3 odoo-bin -c /home/odoo/.odoorc -d "$DB_NAME" -i base --stop-after-init
 	fi
+}
+
+clean_database() {
+	echo "${RED} This db that will be DELETED: "$DB_NAME" ${ENDCOLOR}"
+	sudo -u postgres psql -Atc "SELECT datname FROM pg_database where name ilike "$DB_NAME";"
+	sudo -u postgres dropdb "$DB_NAME"
+	sudo rm -rf ~/.local/share/Odoo/filestore/"$DB_NAME"
 }
 
 set_expiration_date() {
@@ -409,8 +422,8 @@ odoo_local_installation() {
 	fi
 	fetch_git_repositories
 	postgresql_setup
+	setup_odoorc # Prior create_database to add enterprise in path
 	create_database
-	setup_odoorc
 	set_expiration_date
 	add_alias
 	add_desktop_shortcuts
@@ -420,21 +433,30 @@ odoo_local_installation() {
 update_installation() {
 	UPDATE_MODE=1 #Do not annoy user for overwrite questions
 	clear
-	check_memory
-	check_ubuntu
-	check_python
-	install_deps
-	check_ssh_key
-	fetch_git_repositories
+	answer=$(inputdata "${RED}This will highly probably BREAK YOUR EXISTING DATABASES. Are you sure you want to continue [y/N]: ${ENDCOLOR}")
+	if [[ "$answer" =~ ^[Yy]$ ]]; then
+	# if [[ "$answer" =~ ^[Yy]$ ]]; then
+	# 	clean_database
+	# fi
+		check_memory
+		check_ubuntu
+		check_python
+		check_ssh_key
+		fetch_git_repositories
+		install_deps # this needs to be last as it might be updated
+		create_database
+		set_expiration_date
+	fi
 }
 
 menu() {
 	echo "${BLUE}Odoo Local Database installer${ENDCOLOR}"
 	echo "${BLUE}#############################${ENDCOLOR}"
-	echo "${BLUE}Documentation: https://www.odoo.com/odoo/knowledge/18175 ${ENDCOLOR}"
-	echo "${BLUE}1) Complete Install ${ENDCOLOR}"
-	echo "${BLUE}2) Check Tools (only check your laptop have all dependencies installed, if not install them) ${ENDCOLOR}"
-	echo "${BLUE}3) Update this Install (update all Github repository) ${ENDCOLOR}"
+	echo "${BLUE}Script version 1.0 - Odoo 20 - OXP 2026${ENDCOLOR}"
+	echo "${BLUE}Documentation: ${knowledge_article} ${ENDCOLOR}"
+	echo "${BLUE}1) Complete install ${ENDCOLOR}"
+	echo "${BLUE}2) Check tools (only check your laptop have all dependencies installed, if not install them) ${ENDCOLOR}"
+	echo "${BLUE}3) Update this install (including update your code) ${ENDCOLOR}"
 	echo "${BLUE}4) Exit ${ENDCOLOR}"
 	choice=$(inputdata "${GREEN}Select option [1-4]: ${ENDCOLOR}")
 	case "$choice" in
