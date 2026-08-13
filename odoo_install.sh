@@ -325,7 +325,7 @@ install_mailcatcher() {
 create_database() {
 	local pattern="^[0-9a-zA-Z_-]{1,60}$"
 	while :; do
-		answer=$(inputdata "${GREEN}Name of your database you want to create (leave empty to create default one named odoo): ${ENDCOLOR}")
+		DB_NAME=$(inputdata "${GREEN}Name of your database you want to create (leave empty to create default one named odoo): ${ENDCOLOR}")
 		[[ -z "$DB_NAME" ]] && DB_NAME="odoo"
 		[[ $DB_NAME =~ $pattern ]] && break
 		echo "${RED}Invalid name: only a-z, A-Z, 0-9, _ and - allowed.${ENDCOLOR}"
@@ -341,7 +341,7 @@ clean_database() {
 	echo "${RED} This db that will be DELETED: '$DB_NAME' ${ENDCOLOR}"
 	sudo -u postgres psql -Atc "SELECT datname FROM pg_database where name ilike '$DB_NAME';"
 	sudo -u postgres dropdb "$DB_NAME"
-	sudo rm -rf "~/.local/share/Odoo/filestore/${DB_NAME}"
+	sudo rm -rf "/home/odoo/.local/share/Odoo/filestore/${DB_NAME}"
 }
 
 set_expiration_date() {
