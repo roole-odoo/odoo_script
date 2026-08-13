@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-## v20.0
+## v20.1
 ## 20260810
 ## Odoo OXP 2026 - Master=20
 
@@ -14,6 +14,8 @@ ALIAS_NAME="odoo-localDB"
 MANAGER_SHORTCUT_PATH="/home/odoo/Desktop/odoo_local_databases_manager.desktop"
 ODOO_SHORTCUT_PATH="/home/odoo/Desktop/odoo_launcher.desktop"
 USER_PASSWORD=""
+POSTGRES_VERSION=18
+# https://www.odoo.com/documentation/master/administration/on_premise/source.html#postgresql
 
 odoorc_gist_path="https://gist.githubusercontent.com/Abridbus/a4c1ada1e8c61c04ab68cc8ddbb827b1/raw/4614022d0c21bbc02f35254d59c5cefcdbedb12d/.odoorc"
 knowledge_article="https://www.odoo.com/odoo/knowledge/72239"
@@ -191,7 +193,10 @@ install_wkhtmltopdf() {
 
 install_pgvector() {
 	log "${BLUE}  Installing pgvector ...${ENDCOLOR}"
-	run_sudo apt-get install -y "postgresql-18-pgvector"
+	run_sudo apt-get install -y postgresql-common
+	run_sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh
+	run_sudo apt-get install -y "postgresql-${POSTGRES_VERSION} postgresql-${POSTGRES_VERSION}-pgvector"
+	echo 'trusted = true' | sudo tee -a $(pg_config --sharedir)/extension/vector.control
 }
 
 install_rtlcss() {
@@ -446,6 +451,10 @@ update_installation() {
 	fi
 }
 
+debugging() {
+	echo "1"
+}
+
 menu() {
 	local start_time
 	local stop_time
@@ -473,6 +482,7 @@ menu() {
 		update_installation
 		;;
 	4) exit 0 ;;
+	d) debugging ;;
 	*)
 		echo "${RED}Invalid option${ENDCOLOR}"
 		menu
