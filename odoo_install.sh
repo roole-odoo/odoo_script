@@ -447,6 +447,10 @@ update_installation() {
 }
 
 menu() {
+	local start_time
+	local stop_time
+
+	start_time=$(date +%s)
 	echo "${BLUE}Odoo Local Database installer${ENDCOLOR}"
 	echo "${BLUE}#############################${ENDCOLOR}"
 	echo "${BLUE}Script v20.0 following Odoo 20 - OXP 2026${ENDCOLOR}"
@@ -475,6 +479,11 @@ menu() {
 		;;
 	esac
 	unset USER_PASSWORD
+
+	stop_time=$(date +%s)
+	run_time=$((stop_time - start_time))
+
+	log "Run duration: ${run_time}s"
 }
 
 menu
