@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-## v20.1
+## v20.02
 ## 20260810
 ## Odoo OXP 2026 - Master=20
 
@@ -193,9 +193,9 @@ install_wkhtmltopdf() {
 
 install_pgvector() {
 	log "${BLUE}  Installing pgvector ...${ENDCOLOR}"
-	run_sudo apt-get install -y postgresql-common
-	run_sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh
-	run_sudo apt-get install -y "postgresql-${POSTGRES_VERSION} postgresql-${POSTGRES_VERSION}-pgvector"
+	run sudo apt-get install -y postgresql-common
+	sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh
+	run sudo apt-get install -y "postgresql-${POSTGRES_VERSION}-pgvector"
 	echo 'trusted = true' | sudo tee -a $(pg_config --sharedir)/extension/vector.control
 }
 
@@ -297,8 +297,14 @@ fetch_git_repositories() {
 	log "${BLUE}  Installing Odoo debian dependencies (setup/debinstall.sh)${ENDCOLOR}"
 	echo "${BLUE}  It might take a while ...${ENDCOLOR}"
 	echo "${BLUE}  This will require to create a new database ${ENDCOLOR}"
-	run_sudo "${src_path}/odoo/setup/debinstall.sh"
+	debinstall_sh
 	return 0
+}
+
+debinstall_sh() {
+    local src_path="/home/odoo/src"
+    echo "${BLUE} Installing required packages: ${ENDCOLOR}"
+	run_sudo "${src_path}/odoo/setup/debinstall.sh"
 }
 
 postgresql_setup() {
@@ -318,7 +324,8 @@ setup_odoorc() {
 }
 
 install_mailcatcher() {
-	answer=inputdata "${GREEN}Need MailCatcher ? It's for having on local a mailing solution. [y/N]: ${ENDCOLOR}"
+	echo "Mailcatcher is a local mailing solution. If you want to send email and visual them without a mail server"
+	answer=$(inputdata "${GREEN}Do you want to install it [y/N]: ${ENDCOLOR}")
 	if [[ "$answer" =~ ^[Yy]$ ]]; then
 		have mailcatcher && return 0
 		log "${BLUE}  Installing MailCatcher ...${ENDCOLOR}"
@@ -440,19 +447,13 @@ update_installation() {
 	clear
 	answer=$(inputdata "${RED}This will highly probably BREAK YOUR EXISTING DATABASES. Are you sure you want to continue [y/N]: ${ENDCOLOR}")
 	if [[ "$answer" =~ ^[Yy]$ ]]; then
-		check_memory
-		check_ubuntu
-		check_python
-		check_ssh_key
 		fetch_git_repositories
-		install_deps # this needs to be last as it might be updated
-		create_database
-		set_expiration_date
 	fi
 }
 
 debugging() {
-	echo "1"
+	echo "debugmode"
+	update_installation
 }
 
 menu() {
@@ -462,7 +463,7 @@ menu() {
 	start_time=$(date +%s)
 	echo "${BLUE}Odoo Local Database installer${ENDCOLOR}"
 	echo "${BLUE}#############################${ENDCOLOR}"
-	echo "${BLUE}Script v20.0 following Odoo 20 - OXP 2026${ENDCOLOR}"
+	echo "${BLUE}Script v20.02 following Odoo 20 - OXP 2026${ENDCOLOR}"
 	echo "${BLUE}Documentation: ${knowledge_article} ${ENDCOLOR}"
 	echo "${BLUE}1) Complete install ${ENDCOLOR}"
 	echo "${BLUE}2) Check tools (only check your laptop have all dependencies installed, if not install them) ${ENDCOLOR}"
@@ -482,7 +483,7 @@ menu() {
 		update_installation
 		;;
 	4) exit 0 ;;
-	d) debugging ;;
+	deb) debugging ;;
 	*)
 		echo "${RED}Invalid option${ENDCOLOR}"
 		menu
