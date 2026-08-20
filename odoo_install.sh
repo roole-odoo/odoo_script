@@ -254,14 +254,13 @@ clone_repository() {
 	log "${BLUE}  Check and clone ${repo_name} repositorie into ${src_path}/\n  Might be long if it's the first install on your laptop, so, take a coffee... ${ENDCOLOR}"
 	cd $src_path
 	if [[ ! -d "$repo_name" ]]; then
-		run git clone "git@github.com:odoo/${repo_name}.git"
+		git clone --progress "git@github.com:odoo/${repo_name}.git" 2>&1 | tee -a "$LOG"
 	else
 		if [[ "$UPDATE_MODE" != 1 ]]; then
 			answer=$(inputdata "${GREEN}'${repo_name}' directory already exists, do you want to overwrite it ? [y/N]: ${ENDCOLOR}")
 			if [[ "$answer" =~ ^[Yy]$ ]]; then
 				run rm -rf "./${repo_name}"
-				run git clone "git@github.com:odoo/${repo_name}.git"
-			else
+				git clone --progress "git@github.com:odoo/${repo_name}.git" 2>&1 | tee -a "$LOG"
 				log "${BLUE} Skipping clone of '${repo_name}'.${ENDCOLOR}"
 			fi
 		fi
@@ -275,7 +274,7 @@ update_repository() {
 	cd "${src_path}/${repo_name}"
 	git switch master
 	log "Last '${repo_name}' commit HASH : $(git rev-parse HEAD)"
-	run git pull --rebase
+	git pull --rebase --progress 2>&1 | tee -a "$LOG"
 	log "New '${repo_name}' commit HASH : $(git rev-parse HEAD)"
 }
 
