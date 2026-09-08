@@ -218,6 +218,7 @@ install_deps() {
 	install_cmd git
 	install_cmd curl
 	install_cmd psql postgresql-18
+	install_cmd python3-phonenumbers
 	install_wkhtmltopdf
 	install_pgvector
 	log "${BLUE}Dependencies ready.${ENDCOLOR}"
