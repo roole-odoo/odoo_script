@@ -191,6 +191,16 @@ install_wkhtmltopdf() {
 	rm -f /tmp/wkhtml.deb
 }
 
+install_phonenumbers(){
+	log "${BLUE}  Installing python3-phonenumbers ...${ENDCOLOR}"
+	run sudo apt-get install -y python3-phonenumbers
+	if python3 -c "import phonenumbers" &> /dev/null ; then
+		ok "python3-phonenumbers installed"
+	else
+		fail "python3-phonenumbers failed to install"
+	fi
+}
+
 install_pgvector() {
 	log "${BLUE}  Installing pgvector ...${ENDCOLOR}"
 	run sudo apt-get install -y postgresql-common
@@ -218,7 +228,7 @@ install_deps() {
 	install_cmd git
 	install_cmd curl
 	install_cmd psql postgresql-18
-	install_cmd python3-phonenumbers
+	install_phonenumbers
 	install_wkhtmltopdf
 	install_pgvector
 	log "${BLUE}Dependencies ready.${ENDCOLOR}"
