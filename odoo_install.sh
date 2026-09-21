@@ -9,10 +9,12 @@ DEBUG_FILE="/home/odoo/Desktop/odoo_install.debug"
 LOG="/var/log/odoo_installation.log"
 DB_NAME=""
 ADVANCED_MODE=0
+AI_INSTALL=0
 UPDATE_MODE=0
 ALIAS_NAME="odoo-localDB"
 MANAGER_SHORTCUT_PATH="/home/odoo/Desktop/odoo_local_databases_manager.desktop"
 ODOO_SHORTCUT_PATH="/home/odoo/Desktop/odoo_launcher.desktop"
+NGROK_SHORTCUT_PATH="/home/odoo/Desktop/ngrok_launcher.desktop"
 USER_PASSWORD=""
 POSTGRES_VERSION=18
 # https://www.odoo.com/documentation/master/administration/on_premise/source.html#postgresql
@@ -418,6 +420,36 @@ add_desktop_shortcuts() {
 	} >"$ODOO_SHORTCUT_PATH"
 }
 
+add_ngrok_desktop_shortcut() {
+	log "${BLUE}Adding ngrok desktop shortcut${ENDCOLOR}"
+	{
+		echo "[Desktop Entry]"
+		echo "Exec=ngrok http 8069"
+		echo "GenericName=Launch Ngrok tunnel (for AI)"
+		echo "Icon=system-run"
+		echo "Name=Launch Ngrok tunnel"
+		echo "StartupNotify=true"
+		echo "Terminal=true"
+		echo "Type=Application"
+	} >"$NGROK_SHORTCUT_PATH"
+	
+}
+
+install_ngrok() {
+	log "${BLUE}Installing Ngrok$(ENDCOLOR)}"
+	curl -sSL https://ngrok-agent.s3.amazonaws.com/ngrok.asc \
+  		| sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null \
+  		&& echo "deb https://ngrok-agent.s3.amazonaws.com bookworm main" \
+  		| sudo tee /etc/apt/sources.list.d/ngrok.list
+	sudo apt update 
+	sudo apt install ngrok 
+	log "${GREEN}Ngrok installed."
+	log "You'll still need to sign up for an account on https://dashboard.ngrok.com/signup"
+	log "And then get your credentials on https://dashboard.ngrok.com/get-started/your-authtoken$"
+	log "Finally use that credential with the followinf command ngrok ngrok config add-authtoken HERE-YOU-ENTER-YOUR-SECRET-TOKEN  (ENDCOLOR)}"
+}
+
+
 print_end_message() {
 	log "${BLUE}Installation complete.${ENDCOLOR}"
 	echo "${BLUE}Full log: $LOG${ENDCOLOR}"
@@ -433,6 +465,10 @@ odoo_local_installation() {
 	if [[ "$answer" =~ ^[Yy]$ ]]; then
 		ADVANCED_MODE=1
 	fi
+	answer=$(inputdata "${GREEN}Do you need AI support ? Only needed if you work with those [y/N]: ${ENDCOLOR}")
+	if [[ "$answer" =~ ^[Yy]$ ]]; then
+		AI_INSTALL=1
+	fi
 	check_memory
 	check_ubuntu
 	check_python
@@ -441,6 +477,10 @@ odoo_local_installation() {
 	if [[ "$ADVANCED_MODE" == 1 ]]; then
 		install_rtlcss      # right-to-left
 		install_mailcatcher # mail
+	fi
+	if [[ "$AI_INSTALL" == 1 ]]; then
+		install_ngrok
+		add_ngrok_desktop_shortcut
 	fi
 	fetch_git_repositories
 	postgresql_setup
